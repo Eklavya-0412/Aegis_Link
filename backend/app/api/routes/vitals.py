@@ -21,6 +21,10 @@ from app.services import supabase_client as db
 router = APIRouter(prefix="/vitals", tags=["Vitals"])
 
 
+from app.services.anomaly_service import evaluate_anomaly
+from app.services.websocket_manager import ws_manager
+
+
 @router.post(
     "/",
     response_model=VitalResponse,
@@ -33,15 +37,34 @@ async def log_vital(
 ) -> Dict[str, Any]:
     """
     Record a new vital-sign measurement for the authenticated patient.
-
-    The ``recorded_at`` timestamp should reflect when the measurement was
-    actually taken (which may differ from the server time).
+    Evaluates anomaly thresholds post-write and broadcasts alerts to linked caregivers.
     """
     vital_data = body.model_dump(mode="json")
-    # Serialise datetime / enum values for Supabase insert.
     vital_data["vital_type"] = vital_data["vital_type"]
     vital_data["recorded_at"] = str(vital_data["recorded_at"])
-    return await db.create_vital(current_user["user_id"], vital_data)
+    
+    created_vital = await db.create_vital(current_user["user_id"], vital_data)
+    
+    # Anomaly evaluation
+    alert = evaluate_anomaly(created_vital)
+    if alert:
+        await db.log_audit(
+            actor_id=current_user["user_id"],
+            action="ANOMALY_DETECTED",
+            target_type="vital",
+            target_id=created_vital.get("id", ""),
+            metadata=alert,
+        )
+        # Fetch linked caregiver IDs
+        try:
+            linked = await db.get_linked_caregivers(current_user["user_id"])
+            caregiver_ids = [str(item.get("caregiver_id")) for item in linked if item.get("caregiver_id")]
+        except Exception:
+            caregiver_ids = []
+            
+        await ws_manager.broadcast_alert(current_user["user_id"], alert, caregiver_ids)
+        
+    return created_vital
 
 
 @router.get(

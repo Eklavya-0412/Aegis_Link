@@ -1,6 +1,7 @@
 import React from 'react';
 import { User as UserIcon } from 'lucide-react';
 import { CaregiverPatient } from '../types';
+import { maskId } from '../../../utils/piiMasker';
 
 interface PatientCardProps {
   patient: CaregiverPatient;
@@ -21,6 +22,7 @@ export const PatientCard: React.FC<PatientCardProps> = ({
         </div>
         <div>
           <h3 className="font-bold text-gray-800">{patient.name}</h3>
+          <p className="text-xs text-blue-600 font-mono">ID: {maskId(patient.id)}</p>
           <p className="text-sm text-gray-600">Linked: {new Date(patient.linked_at).toLocaleDateString()}</p>
         </div>
       </div>

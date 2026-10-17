@@ -24,6 +24,8 @@ import TelepharmacyModal from '../../features/telepharmacy/TelepharmacyModal';
 import PointsStoreModal from '../../features/rewards/PointsStoreModal';
 import AISymptomChecker from '../../features/symptom-checker';
 import PredictiveHealthInsights from '../../features/insights/PredictiveHealthInsights';
+import { useIdleTimer } from '../../hooks/useIdleTimer';
+import IdleWarningModal from '../common/IdleWarningModal';
 
 export const AppShell: React.FC = () => {
   const { currentUser, currentFamily, selectedMember, setSelectedMember, logout, setCurrentUser } = useAuthStore();
@@ -65,6 +67,7 @@ export const AppShell: React.FC = () => {
   } = useUIStore();
 
   const { showToast } = useToastStore();
+  const { showWarning, secondsRemaining, extendSession } = useIdleTimer();
   const [showSosConfirm, setShowSosConfirm] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
@@ -139,13 +142,7 @@ export const AppShell: React.FC = () => {
 
     switch (activeTab) {
       case 'medications':
-        return (
-          <MedicationManager
-            selectedMember={selectedMember}
-            medications={medications}
-            setMedications={setMedications}
-          />
-        );
+        return <MedicationManager selectedMember={selectedMember} />;
       case 'appointments':
         return (
           <AppointmentManager
@@ -155,7 +152,7 @@ export const AppShell: React.FC = () => {
           />
         );
       case 'vitals':
-        return <VitalManager selectedMember={selectedMember} vitals={vitals} setVitals={setVitals} />;
+        return <VitalManager selectedMember={selectedMember} />;
       case 'insights':
         return (
           <div className="space-y-6">
@@ -312,6 +309,8 @@ export const AppShell: React.FC = () => {
         selectedMember={selectedMember}
         currentFamily={currentFamily}
         medications={medications}
+        vitals={vitals}
+        appointments={appointments}
         showChatbot={showChatbot}
         setShowChatbot={setShowChatbot}
       />
@@ -367,6 +366,10 @@ export const AppShell: React.FC = () => {
         confirmText="Sign Out"
         cancelText="Stay Logged In"
       />
+
+      {showWarning && (
+        <IdleWarningModal secondsRemaining={secondsRemaining} onExtend={extendSession} />
+      )}
 
       <ToastContainer />
     </div>

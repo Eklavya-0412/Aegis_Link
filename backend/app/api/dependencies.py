@@ -14,7 +14,7 @@ Usage in route handlers::
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 from fastapi import Depends, HTTPException, status
 
@@ -121,3 +121,28 @@ async def require_doctor(
             detail="Only doctors can access this resource.",
         )
     return current_user
+
+
+def require_consent(scope: str) -> Callable:
+    """
+    Factory dependency checking access consent for a given scope.
+    """
+    async def _dependency(
+        patient_id: Optional[str] = None,
+        current_user: Dict[str, Any] = Depends(get_current_user),
+    ) -> Dict[str, Any]:
+        target_patient = patient_id or current_user["user_id"]
+        if str(target_patient) == str(current_user["user_id"]):
+            return current_user
+
+        from app.services.supabase_client import check_consent
+        allowed = await check_consent(str(target_patient), str(current_user["user_id"]), scope)
+        if not allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied: missing consent for scope '{scope}' on patient '{target_patient}'.",
+            )
+        return current_user
+
+    return _dependency
+

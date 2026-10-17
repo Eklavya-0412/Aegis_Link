@@ -8,11 +8,78 @@ import {
   MenstrualData,
   User,
   Vital,
-  WellnessChallenge
+  WellnessChallenge,
 } from '../types';
-import { initializeSampleData, SampleData } from '../data/initializeSampleData';
 import { AIHealthInsight, getAIHealthInsight } from '../services/aiInsightsService';
+import { apiClient } from '../services/apiClient';
+import { initializeSampleData } from '../data/initializeSampleData';
 
+// ── Loading / Error state per data domain ─────────────────────────────
+export interface DomainStatus {
+  loading: boolean;
+  error: string | null;
+}
+
+const idle: DomainStatus = { loading: false, error: null };
+const pending: DomainStatus = { loading: true, error: null };
+const failed = (msg: string): DomainStatus => ({ loading: false, error: msg });
+const done: DomainStatus = { loading: false, error: null };
+
+/**
+ * Map a backend Vital (uses `vital_type`, numeric `value`) to the
+ * frontend Vital type (uses `type`, string `value`, `member_id`).
+ */
+function normaliseVital(v: any, userId: string): Vital {
+  return {
+    id: v.id ?? String(Date.now()),
+    type: v.vital_type ?? v.type ?? 'unknown',
+    value: String(v.value ?? ''),
+    unit: v.unit ?? '',
+    recorded_at: v.recorded_at ?? v.created_at ?? new Date().toISOString(),
+    member_id: v.user_id ?? v.member_id ?? userId,
+  };
+}
+
+/**
+ * Map a backend Medication to the frontend Medication type.
+ * Backend uses `is_active`, `time_slots`, `user_id`.
+ */
+function normaliseMedication(m: any, userId: string): Medication {
+  return {
+    id: m.id ?? String(Date.now()),
+    name: m.name ?? '',
+    dosage: m.dosage ?? '',
+    frequency: m.frequency ?? '',
+    times: m.time_slots ?? m.times ?? [],
+    start_date: m.start_date ?? '',
+    end_date: m.end_date,
+    active: m.is_active ?? m.active ?? true,
+    taken_today: m.taken_today ?? false,
+    member_id: m.user_id ?? m.member_id ?? userId,
+  };
+}
+
+/**
+ * Map a backend Appointment to the frontend Appointment type.
+ */
+function normaliseAppointment(a: any, userId: string): Appointment {
+  const dateStr = a.appointment_date
+    ? `${a.appointment_date}T${a.appointment_time ?? '00:00:00'}`
+    : a.appointment_date ?? '';
+  return {
+    id: a.id ?? String(Date.now()),
+    title: a.title ?? '',
+    type: a.type ?? 'doctor',
+    doctor_name: a.doctor_name,
+    appointment_date: dateStr,
+    location: a.location,
+    notes: a.notes,
+    member_id: a.user_id ?? a.member_id ?? userId,
+    status: a.status ?? 'scheduled',
+  };
+}
+
+// ── Store interface ────────────────────────────────────────────────────
 interface HealthDataState {
   medications: Medication[];
   appointments: Appointment[];
@@ -23,21 +90,36 @@ interface HealthDataState {
   wellnessChallenges: WellnessChallenge[];
   aiInsights: AIHealthInsight | null;
 
-  // Actions
+  // Async status per domain
+  status: {
+    vitals: DomainStatus;
+    medications: DomainStatus;
+    appointments: DomainStatus;
+    menstrual: DomainStatus;
+  };
+
+  // ── Fetch actions ──────────────────────────────────────────────────
+  fetchVitals: (userId: string) => Promise<void>;
+  fetchMedications: (userId: string) => Promise<void>;
+  fetchAppointments: (userId: string) => Promise<void>;
+  fetchMenstrual: (userId: string) => Promise<void>;
+  fetchAll: (user: User) => Promise<void>;
+
+  // ── Setter / CRUD actions ──────────────────────────────────────────
   setMedications: (medications: Medication[] | ((prev: Medication[]) => Medication[])) => void;
-  addMedication: (medication: Medication) => void;
-  updateMedication: (id: string, updates: Partial<Medication>) => void;
-  deleteMedication: (id: string) => void;
+  addMedication: (medication: Medication) => Promise<void>;
+  updateMedication: (id: string, updates: Partial<Medication>) => Promise<void>;
+  deleteMedication: (id: string) => Promise<void>;
 
   setAppointments: (appointments: Appointment[] | ((prev: Appointment[]) => Appointment[])) => void;
-  addAppointment: (appointment: Appointment) => void;
-  cancelAppointment: (id: string) => void;
+  addAppointment: (appointment: Appointment) => Promise<void>;
+  cancelAppointment: (id: string) => Promise<void>;
 
   setVitals: (vitals: Vital[] | ((prev: Vital[]) => Vital[])) => void;
-  addVital: (vital: Vital) => void;
+  addVital: (vital: Vital) => Promise<void>;
 
   setMenstrualData: (data: MenstrualData[] | ((prev: MenstrualData[]) => MenstrualData[])) => void;
-  addMenstrualData: (record: MenstrualData) => void;
+  addMenstrualData: (record: MenstrualData) => Promise<void>;
 
   setEmergencyContacts: (contacts: EmergencyContact[] | ((prev: EmergencyContact[]) => EmergencyContact[])) => void;
   addEmergencyContact: (contact: EmergencyContact) => void;
@@ -53,10 +135,16 @@ interface HealthDataState {
 
   setAiInsights: (insights: AIHealthInsight | null) => void;
   fetchAiInsights: (user: User) => Promise<AIHealthInsight>;
-  loadSampleData: (user: User, family: Family | null) => SampleData;
+
+  /**
+   * @deprecated Use `fetchAll(user)` instead.
+   * Kept for compatibility during migration; uses sample fallback.
+   */
+  loadSampleData: (user: User, family: Family | null) => any;
   resetHealthData: () => void;
 }
 
+// ═══════════════════════════════════════════════════════════════════════
 export const useHealthDataStore = create<HealthDataState>((set, get) => ({
   medications: [],
   appointments: [],
@@ -67,103 +155,231 @@ export const useHealthDataStore = create<HealthDataState>((set, get) => ({
   wellnessChallenges: [],
   aiInsights: null,
 
+  status: {
+    vitals: idle,
+    medications: idle,
+    appointments: idle,
+    menstrual: idle,
+  },
+
+  // ── Fetch: Vitals ──────────────────────────────────────────────────
+  fetchVitals: async (userId: string) => {
+    set((s) => ({ status: { ...s.status, vitals: pending } }));
+    try {
+      const { data } = await apiClient.get('/vitals');
+      const rows: Vital[] = Array.isArray(data)
+        ? data.map((v: any) => normaliseVital(v, userId))
+        : [];
+      set((s) => ({
+        vitals: rows,
+        status: { ...s.status, vitals: done },
+      }));
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail ?? err?.message ?? 'Failed to load vitals';
+      set((s) => ({ status: { ...s.status, vitals: failed(msg) } }));
+    }
+  },
+
+  // ── Fetch: Medications ─────────────────────────────────────────────
+  fetchMedications: async (userId: string) => {
+    set((s) => ({ status: { ...s.status, medications: pending } }));
+    try {
+      const { data } = await apiClient.get('/medications');
+      const rows: Medication[] = Array.isArray(data)
+        ? data.map((m: any) => normaliseMedication(m, userId))
+        : [];
+      set((s) => ({
+        medications: rows,
+        status: { ...s.status, medications: done },
+      }));
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail ?? err?.message ?? 'Failed to load medications';
+      set((s) => ({ status: { ...s.status, medications: failed(msg) } }));
+    }
+  },
+
+  // ── Fetch: Appointments ────────────────────────────────────────────
+  fetchAppointments: async (userId: string) => {
+    set((s) => ({ status: { ...s.status, appointments: pending } }));
+    try {
+      const { data } = await apiClient.get('/appointments');
+      const rows: Appointment[] = Array.isArray(data)
+        ? data.map((a: any) => normaliseAppointment(a, userId))
+        : [];
+      set((s) => ({
+        appointments: rows,
+        status: { ...s.status, appointments: done },
+      }));
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail ?? err?.message ?? 'Failed to load appointments';
+      set((s) => ({ status: { ...s.status, appointments: failed(msg) } }));
+    }
+  },
+
+  // ── Fetch: Menstrual ───────────────────────────────────────────────
+  fetchMenstrual: async (userId: string) => {
+    set((s) => ({ status: { ...s.status, menstrual: pending } }));
+    try {
+      const { data } = await apiClient.get('/menstrual');
+      const rows: MenstrualData[] = Array.isArray(data) ? data : [];
+      set((s) => ({
+        menstrualData: rows,
+        status: { ...s.status, menstrual: done },
+      }));
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail ?? err?.message ?? 'Failed to load menstrual data';
+      set((s) => ({ status: { ...s.status, menstrual: failed(msg) } }));
+    }
+  },
+
+  // ── Fetch all in parallel ──────────────────────────────────────────
+  fetchAll: async (user: User) => {
+    const uid = user.user_id;
+    await Promise.all([
+      get().fetchVitals(uid),
+      get().fetchMedications(uid),
+      get().fetchAppointments(uid),
+      get().fetchMenstrual(uid),
+      get().fetchAiInsights(user),
+    ]);
+  },
+
+  // ── Medication CRUD ────────────────────────────────────────────────
   setMedications: (updater) =>
-    set((state) => ({
-      medications: typeof updater === 'function' ? updater(state.medications) : updater
+    set((s) => ({
+      medications: typeof updater === 'function' ? updater(s.medications) : updater,
     })),
 
-  addMedication: (medication) =>
-    set((state) => ({ medications: [...state.medications, medication] })),
+  addMedication: async (medication) => {
+    // Optimistic update
+    set((s) => ({ medications: [...s.medications, medication] }));
+    try {
+      await apiClient.post('/medications', medication);
+    } catch (e) {
+      console.warn('API sync failed for addMedication:', e);
+    }
+  },
 
-  updateMedication: (id, updates) =>
-    set((state) => ({
-      medications: state.medications.map((m) => (m.id === id ? { ...m, ...updates } : m))
-    })),
+  updateMedication: async (id, updates) => {
+    set((s) => ({
+      medications: s.medications.map((m) => (m.id === id ? { ...m, ...updates } : m)),
+    }));
+    try {
+      await apiClient.put(`/medications/${id}`, updates);
+    } catch (e) {
+      console.warn('API sync failed for updateMedication:', e);
+    }
+  },
 
-  deleteMedication: (id) =>
-    set((state) => ({
-      medications: state.medications.filter((m) => m.id !== id)
-    })),
+  deleteMedication: async (id) => {
+    set((s) => ({ medications: s.medications.filter((m) => m.id !== id) }));
+    try {
+      await apiClient.delete(`/medications/${id}`);
+    } catch (e) {
+      console.warn('API sync failed for deleteMedication:', e);
+    }
+  },
 
+  // ── Appointment CRUD ───────────────────────────────────────────────
   setAppointments: (updater) =>
-    set((state) => ({
-      appointments: typeof updater === 'function' ? updater(state.appointments) : updater
+    set((s) => ({
+      appointments: typeof updater === 'function' ? updater(s.appointments) : updater,
     })),
 
-  addAppointment: (appointment) =>
-    set((state) => ({ appointments: [...state.appointments, appointment] })),
+  addAppointment: async (appointment) => {
+    set((s) => ({ appointments: [...s.appointments, appointment] }));
+    try {
+      await apiClient.post('/appointments', appointment);
+    } catch (e) {
+      console.warn('API sync failed for addAppointment:', e);
+    }
+  },
 
-  cancelAppointment: (id) =>
-    set((state) => ({
-      appointments: state.appointments.map((a) =>
+  cancelAppointment: async (id) => {
+    set((s) => ({
+      appointments: s.appointments.map((a) =>
         a.id === id ? { ...a, status: 'cancelled' as const } : a
-      )
-    })),
+      ),
+    }));
+    try {
+      await apiClient.put(`/appointments/${id}`, { status: 'cancelled' });
+    } catch (e) {
+      console.warn('API sync failed for cancelAppointment:', e);
+    }
+  },
 
+  // ── Vitals CRUD ────────────────────────────────────────────────────
   setVitals: (updater) =>
-    set((state) => ({
-      vitals: typeof updater === 'function' ? updater(state.vitals) : updater
+    set((s) => ({
+      vitals: typeof updater === 'function' ? updater(s.vitals) : updater,
     })),
 
-  addVital: (vital) =>
-    set((state) => ({ vitals: [vital, ...state.vitals] })),
+  addVital: async (vital) => {
+    set((s) => ({ vitals: [vital, ...s.vitals] }));
+    try {
+      await apiClient.post('/vitals', vital);
+    } catch (e) {
+      console.warn('API sync failed for addVital:', e);
+    }
+  },
 
+  // ── Menstrual CRUD ─────────────────────────────────────────────────
   setMenstrualData: (updater) =>
-    set((state) => ({
-      menstrualData: typeof updater === 'function' ? updater(state.menstrualData) : updater
+    set((s) => ({
+      menstrualData: typeof updater === 'function' ? updater(s.menstrualData) : updater,
     })),
 
-  addMenstrualData: (record) =>
-    set((state) => ({ menstrualData: [record, ...state.menstrualData] })),
+  addMenstrualData: async (record) => {
+    set((s) => ({ menstrualData: [record, ...s.menstrualData] }));
+    try {
+      await apiClient.post('/menstrual', record);
+    } catch (e) {
+      console.warn('API sync failed for addMenstrualData:', e);
+    }
+  },
 
+  // ── Emergency contacts (local only) ───────────────────────────────
   setEmergencyContacts: (updater) =>
-    set((state) => ({
-      emergencyContacts: typeof updater === 'function' ? updater(state.emergencyContacts) : updater
+    set((s) => ({
+      emergencyContacts: typeof updater === 'function' ? updater(s.emergencyContacts) : updater,
     })),
-
   addEmergencyContact: (contact) =>
-    set((state) => ({ emergencyContacts: [...state.emergencyContacts, contact] })),
-
+    set((s) => ({ emergencyContacts: [...s.emergencyContacts, contact] })),
   deleteEmergencyContact: (id) =>
-    set((state) => ({
-      emergencyContacts: state.emergencyContacts.filter((c) => c.id !== id)
-    })),
+    set((s) => ({ emergencyContacts: s.emergencyContacts.filter((c) => c.id !== id) })),
 
+  // ── Health Goals (local only) ──────────────────────────────────────
   setHealthGoals: (updater) =>
-    set((state) => ({
-      healthGoals: typeof updater === 'function' ? updater(state.healthGoals) : updater
+    set((s) => ({
+      healthGoals: typeof updater === 'function' ? updater(s.healthGoals) : updater,
     })),
-
   addHealthGoal: (goal) =>
-    set((state) => ({ healthGoals: [...state.healthGoals, goal] })),
-
+    set((s) => ({ healthGoals: [...s.healthGoals, goal] })),
   updateHealthGoalProgress: (id, progress) =>
-    set((state) => ({
-      healthGoals: state.healthGoals.map((g) =>
+    set((s) => ({
+      healthGoals: s.healthGoals.map((g) =>
         g.id === id ? { ...g, current_value: progress, completed: progress >= g.target_value } : g
-      )
+      ),
     })),
 
+  // ── Wellness challenges (local only) ──────────────────────────────
   setWellnessChallenges: (updater) =>
-    set((state) => ({
-      wellnessChallenges: typeof updater === 'function' ? updater(state.wellnessChallenges) : updater
+    set((s) => ({
+      wellnessChallenges: typeof updater === 'function' ? updater(s.wellnessChallenges) : updater,
     })),
-
   addWellnessChallenge: (challenge) =>
-    set((state) => ({ wellnessChallenges: [...state.wellnessChallenges, challenge] })),
-
+    set((s) => ({ wellnessChallenges: [...s.wellnessChallenges, challenge] })),
   updateChallengeProgress: (id, progress, memberId) =>
-    set((state) => ({
-      wellnessChallenges: state.wellnessChallenges.map((c) => {
+    set((s) => ({
+      wellnessChallenges: s.wellnessChallenges.map((c) => {
         if (c.id !== id) return c;
-        const newFamProgress = { ...c.family_progress };
-        if (memberId) {
-          newFamProgress[memberId] = progress;
-        }
-        return { ...c, progress, family_progress: newFamProgress };
-      })
+        const fp = { ...c.family_progress };
+        if (memberId) fp[memberId] = progress;
+        return { ...c, progress, family_progress: fp };
+      }),
     })),
 
+  // ── AI insights ────────────────────────────────────────────────────
   setAiInsights: (insights) => set({ aiInsights: insights }),
 
   fetchAiInsights: async (user: User) => {
@@ -174,21 +390,22 @@ export const useHealthDataStore = create<HealthDataState>((set, get) => ({
     return insights;
   },
 
+  // ── loadSampleData (legacy compatibility) ──────────────────────────
   loadSampleData: (user: User, family: Family | null) => {
-    const data = initializeSampleData(user, family);
+    const sample = initializeSampleData(user, family);
+    // Set local-only data immediately
     set({
-      medications: data.medications,
-      appointments: data.appointments,
-      vitals: data.vitals,
-      emergencyContacts: data.emergencyContacts,
-      healthGoals: data.healthGoals,
-      wellnessChallenges: data.wellnessChallenges,
-      menstrualData: data.menstrualData
+      emergencyContacts: sample.emergencyContacts,
+      healthGoals: sample.healthGoals,
+      wellnessChallenges: sample.wellnessChallenges,
+      menstrualData: sample.menstrualData,
     });
-    get().fetchAiInsights(user);
-    return data;
+    // Kick off async fetch from backend (will replace sample data if successful)
+    get().fetchAll(user).catch(console.warn);
+    return sample;
   },
 
+  // ── Reset ──────────────────────────────────────────────────────────
   resetHealthData: () =>
     set({
       medications: [],
@@ -198,7 +415,7 @@ export const useHealthDataStore = create<HealthDataState>((set, get) => ({
       emergencyContacts: [],
       healthGoals: [],
       wellnessChallenges: [],
-      aiInsights: null
-    })
+      aiInsights: null,
+      status: { vitals: idle, medications: idle, appointments: idle, menstrual: idle },
+    }),
 }));
-

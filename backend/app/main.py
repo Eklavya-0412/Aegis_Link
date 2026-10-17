@@ -19,7 +19,22 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import ai_features, appointments, medications, users, vitals
+from app.api.routes import (
+    ai_features,
+    appointments,
+    audit,
+    checkins,
+    consent,
+    documents,
+    lab_results,
+    medications,
+    menstrual,
+    tasks,
+    treatment_plans,
+    users,
+    vitals,
+    websocket_routes,
+)
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
 
@@ -38,8 +53,9 @@ app = FastAPI(
     description=(
         "Backend API for the Aegis Link family health management platform. "
         "Provides endpoints for user management, vital-sign tracking, "
-        "medication management, appointment scheduling, and AI-powered "
-        "health features (chatbot, symptom checker, health insights)."
+        "medication management, appointment scheduling, document vault, "
+        "access consent, audit logging, menstrual cycle tracking, caregiver check-ins, "
+        "treatment plans, lab results, care tasks, and AI features."
     ),
     version="1.0.0",
     docs_url="/api/docs",
@@ -65,6 +81,16 @@ app.include_router(vitals.router, prefix="/api")
 app.include_router(medications.router, prefix="/api")
 app.include_router(appointments.router, prefix="/api")
 app.include_router(ai_features.router, prefix="/api")
+app.include_router(documents.router, prefix="/api")
+app.include_router(consent.router, prefix="/api")
+app.include_router(audit.router, prefix="/api")
+app.include_router(menstrual.router, prefix="/api")
+app.include_router(checkins.router, prefix="/api")
+app.include_router(treatment_plans.router, prefix="/api")
+app.include_router(lab_results.router, prefix="/api")
+app.include_router(tasks.router, prefix="/api")
+app.include_router(websocket_routes.router, prefix="/api")
+
 
 
 # ── Health check ──────────────────────────────────────────────────────

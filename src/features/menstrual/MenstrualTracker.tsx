@@ -1,6 +1,7 @@
 import React, { useState, type Dispatch, type SetStateAction } from 'react';
 import { Baby, Plus } from 'lucide-react';
 import { MenstrualData, User } from '../../types';
+import { useToastStore } from '../../store/toastStore';
 
 interface MenstrualTrackerProps {
   selectedMember: User | null;
@@ -52,6 +53,7 @@ const MenstrualTracker: React.FC<MenstrualTrackerProps> = ({
     setMenstrualData([...menstrualData, newData]);
     setShowForm(false);
     setCycleData({ cycle_start: '', cycle_length: 28, symptoms: [], flow_intensity: 'medium' });
+    useToastStore.getState().showToast('Menstrual cycle data logged successfully!', 'success');
   };
 
   const memberCycles = menstrualData.filter((d) => d.member_id === selectedMember?.user_id);

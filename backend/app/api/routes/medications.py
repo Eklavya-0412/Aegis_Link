@@ -149,3 +149,81 @@ async def get_patient_medications(
     Allow caregivers and doctors to view a specific patient's medication list.
     """
     return await db.get_medications(patient_id, active_only=active_only)
+
+
+@router.put(
+    "/patient/{patient_id}/{medication_id}",
+    response_model=MedicationResponse,
+    summary="Update patient medication dosage/schedule (Caregiver or Doctor - TC_06)",
+)
+async def update_patient_medication(
+    patient_id: str,
+    medication_id: str,
+    body: MedicationUpdate,
+    current_user: Dict[str, Any] = Depends(
+        require_roles(["caregiver", "doctor"])
+    ),
+) -> Dict[str, Any]:
+    """
+    Caregiver or Doctor updates medication dosage, frequency, or schedule.
+    Enforces audit logging as required by TC_06 and EXP6 Sequence Diagram.
+    """
+    updates = body.model_dump(exclude_unset=True, mode="json")
+    if not updates:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No fields to update.",
+        )
+    if "start_date" in updates and updates["start_date"]:
+        updates["start_date"] = str(updates["start_date"])
+    if "end_date" in updates and updates["end_date"]:
+        updates["end_date"] = str(updates["end_date"])
+
+    result = await db.update_patient_medication(
+        medication_id=medication_id,
+        patient_id=patient_id,
+        actor_id=current_user["user_id"],
+        actor_role=current_user["role"],
+        updates=updates,
+    )
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Medication not found.",
+        )
+    return result
+
+
+@router.post(
+    "/patient/{patient_id}",
+    response_model=MedicationResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Prescribe or add medication for patient (Doctor or Caregiver)",
+)
+async def add_patient_medication(
+    patient_id: str,
+    body: MedicationCreate,
+    current_user: Dict[str, Any] = Depends(
+        require_roles(["doctor", "caregiver"])
+    ),
+) -> Dict[str, Any]:
+    """Prescribe medication for a patient and log audit trail."""
+    med_data = body.model_dump(mode="json")
+    med_data["start_date"] = str(med_data["start_date"])
+    if med_data.get("end_date"):
+        med_data["end_date"] = str(med_data["end_date"])
+
+    created = await db.create_medication(patient_id, med_data)
+    await db.log_audit(
+        actor_id=current_user["user_id"],
+        action="PRESCRIBE_MEDICATION",
+        target_type="medication",
+        target_id=str(created.get("id", "")),
+        metadata={
+            "patient_id": patient_id,
+            "medication_name": med_data.get("name"),
+            "dosage": med_data.get("dosage"),
+        },
+    )
+    return created
+

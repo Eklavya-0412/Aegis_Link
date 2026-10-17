@@ -25,13 +25,16 @@ class Settings(BaseSettings):
     )
 
     # ── Supabase ──────────────────────────────────────────────────────
-    supabase_url: str
-    supabase_anon_key: str
-    supabase_service_role_key: str
-    supabase_jwt_secret: str
+    supabase_url: str = "https://iwmatngjrrlrpwwlljel.supabase.co"
+    supabase_anon_key: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3bWF0bmdqcnJscnB3d2xsamVsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5NzQxNTYsImV4cCI6MjEwNTU1MDE1Nn0.FVfT0dg51-OVSwHT32BdKJL35USYKeptrHbWY8y7A08"
+    supabase_service_role_key: str = "dummy_service_role_key_for_dev"
+    supabase_jwt_secret: str = "super_secret_jwt_key_aegis_link_2026"
 
     # ── Groq AI ───────────────────────────────────────────────────────
-    groq_api_key: str
+    groq_api_key: str = "gsk_dummy_groq_api_key"
+
+    # ── Security & Encryption ─────────────────────────────────────────
+    document_encryption_key: str = "aegis_link_aes256_master_key_2026_super_secret"
 
     # ── Application ───────────────────────────────────────────────────
     app_env: str = "development"

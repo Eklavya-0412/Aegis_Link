@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useAuthStore, useHealthDataStore, useToastStore } from './store';
 import { useLiveVitals } from './hooks/useLiveVitals';
+import { useAlertSocket } from './hooks/useAlertSocket';
 import LandingPage from './features/auth/LandingPage';
 import AuthForm from './features/auth/AuthForm';
 import AppShell from './components/layout/AppShell';
@@ -17,27 +18,36 @@ const AegisLink: React.FC = () => {
     setShowLanding,
     initSession,
     login,
-    signup
+    signup,
   } = useAuthStore();
 
-  const { setVitals, loadSampleData, fetchAiInsights } = useHealthDataStore();
+  // fetchAll replaces the old loadSampleData – it fetches real data from FastAPI
+  // and falls back to sample data if the backend is unreachable.
+  const { setVitals, fetchAll, loadSampleData } = useHealthDataStore();
   const { showToast } = useToastStore();
 
+  // On mount: restore session from refresh token, then load data
   useEffect(() => {
-    const { user, family } = initSession();
-    if (user) {
-      loadSampleData(user, family);
-      fetchAiInsights(user);
-    }
-  }, [initSession, loadSampleData, fetchAiInsights]);
+    const runInit = async () => {
+      const res = await initSession();
+      if (res?.user) {
+        const { user, family } = res;
+        // fetchAll = parallel fetch of vitals, medications, appointments, menstrual
+        fetchAll(user).catch(() => loadSampleData(user, family));
+      }
+    };
+    runInit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useLiveVitals(currentFamily, setVitals);
+  useAlertSocket();
 
   const handleAuthSubmit = async (formData: AuthFormData) => {
     try {
       const result = authMode === 'login' ? await login(formData) : await signup(formData);
-      loadSampleData(result.user, result.family);
-      fetchAiInsights(result.user);
+      // Load real data from backend; fall back to sample if the call fails
+      fetchAll(result.user).catch(() => loadSampleData(result.user, result.family));
     } catch {
       showToast('Authentication failed. Please check your credentials and try again.', 'error');
     }

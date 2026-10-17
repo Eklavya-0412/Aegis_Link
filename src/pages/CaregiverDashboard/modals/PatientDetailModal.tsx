@@ -2,12 +2,16 @@ import React from 'react';
 import { XCircle } from 'lucide-react';
 import { Appointment, Medication, User, Vital } from '../../../types';
 
+import { maskId } from '../../../utils/piiMasker';
+
 interface PatientDetailModalProps {
   patient: User;
   medications: Medication[];
   appointments: Appointment[];
   vitals: Vital[];
   onClose: () => void;
+  onOpenCheckIn?: (patientId: string) => void;
+  onOpenManageMeds?: (patient: User) => void;
 }
 
 export const PatientDetailModal: React.FC<PatientDetailModalProps> = ({
@@ -15,7 +19,9 @@ export const PatientDetailModal: React.FC<PatientDetailModalProps> = ({
   medications,
   appointments,
   vitals,
-  onClose
+  onClose,
+  onOpenCheckIn,
+  onOpenManageMeds
 }) => {
   const patientMeds = medications.filter((m) => m.member_id === patient.user_id);
   const patientAppts = appointments.filter((a) => a.member_id === patient.user_id);
@@ -37,7 +43,7 @@ export const PatientDetailModal: React.FC<PatientDetailModalProps> = ({
           <div className="md:col-span-1 space-y-4">
             <div className="p-4 bg-blue-50 rounded-xl border">
               <p className="text-xs text-gray-600">Patient ID</p>
-              <p className="font-mono font-bold text-blue-700">{patient.patient_id || 'N/A'}</p>
+              <p className="font-mono font-bold text-blue-700">{maskId(patient.patient_id || patient.user_id)}</p>
             </div>
             <div className="p-4 bg-emerald-50 rounded-xl border">
               <p className="text-xs text-gray-600">Medications</p>
@@ -46,6 +52,31 @@ export const PatientDetailModal: React.FC<PatientDetailModalProps> = ({
             <div className="p-4 bg-purple-50 rounded-xl border">
               <p className="text-xs text-gray-600">Appointments</p>
               <p className="font-bold text-purple-700">{patientAppts.length}</p>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              {onOpenCheckIn && (
+                <button
+                  onClick={() => {
+                    onClose();
+                    onOpenCheckIn(patient.user_id);
+                  }}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-xl text-xs font-semibold shadow transition"
+                >
+                  Log Visit Check-In
+                </button>
+              )}
+              {onOpenManageMeds && (
+                <button
+                  onClick={() => {
+                    onClose();
+                    onOpenManageMeds(patient);
+                  }}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-xl text-xs font-semibold shadow transition"
+                >
+                  Manage Medications
+                </button>
+              )}
             </div>
           </div>
           <div className="md:col-span-2 space-y-6">

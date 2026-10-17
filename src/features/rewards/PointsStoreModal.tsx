@@ -2,7 +2,6 @@ import React from 'react';
 import { Award, Gift, Heart, Pill, Target, XCircle } from 'lucide-react';
 import { Coupon, User } from '../../types';
 import { sampleCoupons } from '../../constants/sampleCoupons';
-import { saveUser } from '../../services/storageService';
 
 interface PointsStoreModalProps {
   onClose: () => void;
@@ -22,7 +21,6 @@ const PointsStoreModal: React.FC<PointsStoreModalProps> = ({
       if (currentUser) {
         const updatedUser = { ...currentUser, points: userPoints - coupon.points_required };
         setCurrentUser(updatedUser);
-        saveUser(updatedUser);
       }
       alert(
         `Successfully redeemed: ${coupon.title}! You now have ${

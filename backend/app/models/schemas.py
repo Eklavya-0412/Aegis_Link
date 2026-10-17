@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, time
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -74,15 +74,22 @@ class SymptomSeverity(str, Enum):
 
 # ── Users ─────────────────────────────────────────────────────────────
 
+# ── Users ─────────────────────────────────────────────────────────────
+
 class UserBase(BaseModel):
-    """Shared user profile fields."""
+    """Shared user profile fields aligned with UML Class Diagram."""
     full_name: str = Field(..., min_length=1, max_length=120, examples=["Jane Doe"])
     email: EmailStr
     role: UserRole
     phone: Optional[str] = Field(None, max_length=20, examples=["+1-555-0199"])
     avatar_url: Optional[str] = None
     date_of_birth: Optional[date] = None
-    blood_group: Optional[str] = Field(None, max_length=5, examples=["O+"])
+    blood_group: Optional[str] = Field(None, max_length=10, examples=["O+"])
+    specialization: Optional[str] = Field(None, max_length=150, description="Doctor specialization")
+    license_no: Optional[str] = Field(None, max_length=100, description="Doctor license number")
+    shift_timing: Optional[str] = Field(None, max_length=100, description="Caregiver shift timing")
+    assigned_ward: Optional[str] = Field(None, max_length=100, description="Caregiver assigned ward")
+    relation_to_patient: Optional[str] = Field(None, max_length=100, description="Family relation to patient")
 
 
 class UserCreate(UserBase):
@@ -96,9 +103,14 @@ class UserUpdate(BaseModel):
     phone: Optional[str] = Field(None, max_length=20)
     avatar_url: Optional[str] = None
     date_of_birth: Optional[date] = None
-    blood_group: Optional[str] = Field(None, max_length=5)
+    blood_group: Optional[str] = Field(None, max_length=10)
+    specialization: Optional[str] = None
+    license_no: Optional[str] = None
+    shift_timing: Optional[str] = None
+    assigned_ward: Optional[str] = None
+    relation_to_patient: Optional[str] = None
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
 
 class UserResponse(UserBase):
@@ -107,7 +119,35 @@ class UserResponse(UserBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, extra="ignore")
+
+
+
+class LoginRequest(BaseModel):
+    """Request body for POST /api/users/login."""
+    email: EmailStr
+    password: str
+
+
+class UserLoginData(BaseModel):
+    id: str
+    role: str
+    name: str
+    email: EmailStr
+
+
+class LoginResponse(BaseModel):
+    """Response body for login and token refresh endpoints."""
+    access_token: str
+    token_type: str = "bearer"
+    refresh_token: str
+    user: UserLoginData
+
+
+class RefreshRequest(BaseModel):
+    """Request body for token refresh."""
+    refresh_token: str
+
 
 
 # ── Patient ↔ Caregiver Mapping ──────────────────────────────────────
@@ -157,15 +197,16 @@ class MedicationUpdate(BaseModel):
     time_slots: Optional[List[str]] = None
     end_date: Optional[date] = None
     notes: Optional[str] = Field(None, max_length=500)
+    reason: Optional[str] = Field(None, max_length=500, description="Reason for modification (logged in audit trail)")
     is_active: Optional[bool] = None
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
 
 class MedicationResponse(MedicationBase):
     """Medication record returned from the API."""
-    id: UUID
-    user_id: UUID
+    id: Union[UUID, str]
+    user_id: Union[UUID, str]
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -299,3 +340,234 @@ class HealthInsightsResponse(BaseModel):
     alerts: List[str]
     recommendations: List[str]
     disclaimer: str = "These insights are AI-generated and should be reviewed by a healthcare professional."
+
+
+# ── Document Vault Schemas ──────────────────────────────────────────
+
+class DocumentUploadResponse(BaseModel):
+    document_id: UUID
+    filename: str
+    uploaded_at: datetime
+
+
+class DocumentResponse(BaseModel):
+    id: UUID
+    patient_id: UUID
+    filename: str
+    uploaded_by: UUID
+    uploaded_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ── Access Consent Schemas ──────────────────────────────────────────
+
+class ConsentGrantRequest(BaseModel):
+    patient_id: UUID
+    grantee_id: UUID
+    scope: str = Field(..., description="e.g. menstrual_log, documents, vitals, or all")
+    expires_at: Optional[datetime] = None
+
+
+class ConsentRevokeRequest(BaseModel):
+    consent_id: UUID
+
+
+class ConsentCheckResponse(BaseModel):
+    allowed: bool
+    patient_id: UUID
+    grantee_id: UUID
+    scope: str
+
+
+class ConsentResponse(BaseModel):
+    id: UUID
+    patient_id: UUID
+    grantee_id: UUID
+    scope: str
+    granted_at: datetime
+    expires_at: Optional[datetime] = None
+    revoked_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ── Audit Trail Schemas ──────────────────────────────────────────────
+
+class AuditLogResponse(BaseModel):
+    id: UUID
+    actor_id: UUID
+    action: str
+    target_type: str
+    target_id: UUID
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AuditLogPaginatedResponse(BaseModel):
+    items: List[AuditLogResponse]
+    next_cursor: Optional[str] = None
+
+
+# ── Menstrual Tracking Schemas ──────────────────────────────────────
+
+class MenstrualLogBase(BaseModel):
+    patient_id: UUID
+    start_date: date
+    end_date: Optional[date] = None
+    symptoms: List[str] = Field(default_factory=list)
+    notes: Optional[str] = Field(None, max_length=500)
+
+
+class MenstrualLogCreate(MenstrualLogBase):
+    pass
+
+
+class MenstrualLogUpdate(BaseModel):
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    symptoms: Optional[List[str]] = None
+    notes: Optional[str] = Field(None, max_length=500)
+    model_config = ConfigDict(extra="forbid")
+
+
+class MenstrualLogResponse(MenstrualLogBase):
+    id: UUID
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ── Caregiver Check-ins & Activity Logs (UML UC11 & UC12) ───────────
+
+class CaregiverCheckinBase(BaseModel):
+    patient_id: Union[UUID, str]
+    visit_type: str = Field(default="routine_check", description="'routine_check', 'medication_administration', 'vital_monitoring', 'emergency_response'")
+    notes: str = Field(..., min_length=1, max_length=2000)
+    vitals_recorded: Dict[str, Any] = Field(default_factory=dict)
+    medications_administered: List[str] = Field(default_factory=list)
+
+
+class CaregiverCheckinCreate(CaregiverCheckinBase):
+    pass
+
+
+class CaregiverCheckinResponse(CaregiverCheckinBase):
+    id: Union[UUID, str]
+    caregiver_id: Union[UUID, str]
+    caregiver_name: Optional[str] = None
+    checkin_time: datetime
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ── Treatment Plans (UML UC8 & Doctor Oversight) ─────────────────────
+
+class TreatmentPlanBase(BaseModel):
+    patient_id: Union[UUID, str]
+    title: str = Field(..., min_length=1, max_length=200)
+    diagnosis: Optional[str] = Field(None, max_length=500)
+    plan_details: str = Field(..., min_length=1, max_length=5000)
+    dietary_guidelines: Optional[str] = Field(None, max_length=2000)
+    prescriptions: List[Dict[str, Any]] = Field(default_factory=list)
+    status: str = Field(default="active")
+
+
+class TreatmentPlanCreate(TreatmentPlanBase):
+    pass
+
+
+class TreatmentPlanUpdate(BaseModel):
+    title: Optional[str] = None
+    diagnosis: Optional[str] = None
+    plan_details: Optional[str] = None
+    dietary_guidelines: Optional[str] = None
+    prescriptions: Optional[List[Dict[str, Any]]] = None
+    status: Optional[str] = None
+    model_config = ConfigDict(extra="ignore")
+
+
+class TreatmentPlanResponse(TreatmentPlanBase):
+    id: Union[UUID, str]
+    doctor_id: Union[UUID, str]
+    doctor_name: Optional[str] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ── Lab Results (UML UC6 & UC9) ──────────────────────────────────────
+
+class LabResultBase(BaseModel):
+    patient_id: Union[UUID, str]
+    patient_name: Optional[str] = None
+    doctor_name: Optional[str] = None
+    test_name: str = Field(..., min_length=1, max_length=200)
+    category: str = Field(default="cbc", description="'cbc', 'metabolic', 'lipid', 'urinalysis', 'cardiac'")
+    test_date: Optional[datetime] = None
+    panel_results: Dict[str, Any] = Field(default_factory=dict)
+    overall_status: str = Field(default="normal", description="'normal', 'borderline', 'abnormal', 'critical'")
+    notes: Optional[str] = None
+    is_encrypted: bool = False
+
+
+class LabResultCreate(LabResultBase):
+    pass
+
+
+class LabResultResponse(LabResultBase):
+    id: Union[UUID, str]
+    ordered_by: Optional[Union[UUID, str]] = None
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ── Care Tasks ───────────────────────────────────────────────────────
+
+class CareTaskBase(BaseModel):
+    patient_id: Union[UUID, str]
+    caregiver_id: Optional[Union[UUID, str]] = None
+    title: str = Field(..., min_length=1, max_length=250)
+    description: Optional[str] = Field(None, max_length=1000)
+    category: str = Field(default="general")
+    due_time: Optional[time] = None
+    priority: str = Field(default="normal", description="'low', 'normal', 'high', 'emergency'")
+    is_completed: bool = False
+
+
+class CareTaskCreate(CareTaskBase):
+    pass
+
+
+class CareTaskUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    due_time: Optional[time] = None
+    priority: Optional[str] = None
+    is_completed: Optional[bool] = None
+    caregiver_id: Optional[Union[UUID, str]] = None
+    model_config = ConfigDict(extra="ignore")
+
+
+class CareTaskResponse(CareTaskBase):
+    id: Union[UUID, str]
+    patient_name: Optional[str] = None
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ── Legacy AI Insights Format Compatibility ──────────────────────────
+
+class AIInsightCompatRequest(BaseModel):
+    user_id: Optional[Union[UUID, str]] = None
+    patient_id: Optional[Union[UUID, str]] = None
+    vitals: Optional[List[Dict[str, Any]]] = None
+    time_range_days: int = 7
+
+
+class AIInsightCompatResponse(BaseModel):
+    risk_level: str
+    recommendations: List[str]
+    predicted_trends: str
+    confidence: float
+
+

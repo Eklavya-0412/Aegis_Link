@@ -1,15 +1,13 @@
 """
-Supabase JWT validation logic.
+Supabase & Aegis Link JWT validation and generation logic.
 
-Provides a reusable dependency that extracts the Bearer token from the
-``Authorization`` header, verifies it against the Supabase JWT secret,
-and returns the decoded payload including the user's ``sub`` (user ID)
-and any custom ``app_metadata`` / ``user_metadata`` claims.
+Provides reusable token verification and generation functions.
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from datetime import datetime, timedelta
+from typing import Any, Dict, Optional
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -17,34 +15,61 @@ from jose import JWTError, jwt
 
 from app.core.config import Settings, get_settings
 
-# FastAPI security scheme – extracts the Bearer token automatically.
-_bearer_scheme = HTTPBearer()
+_bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def create_access_token(
+    user_id: str,
+    email: str,
+    role: str,
+    name: str = "",
+    expires_delta: Optional[timedelta] = None,
+) -> str:
+    """Generate a signed JWT access_token compatible with Supabase JWT format."""
+    settings = get_settings()
+    expire = datetime.utcnow() + (expires_delta or timedelta(hours=24))
+    payload = {
+        "sub": str(user_id),
+        "email": email,
+        "aud": "authenticated",
+        "role": "authenticated",
+        "app_metadata": {"role": role},
+        "user_metadata": {"full_name": name},
+        "exp": expire,
+    }
+    return jwt.encode(payload, settings.supabase_jwt_secret, algorithm="HS256")
+
+
+def create_refresh_token(
+    user_id: str,
+    email: str,
+    role: str,
+    expires_delta: Optional[timedelta] = None,
+) -> str:
+    """Generate a signed refresh token."""
+    settings = get_settings()
+    expire = datetime.utcnow() + (expires_delta or timedelta(days=7))
+    payload = {
+        "sub": str(user_id),
+        "email": email,
+        "role": role,
+        "type": "refresh",
+        "exp": expire,
+    }
+    return jwt.encode(payload, settings.supabase_jwt_secret, algorithm="HS256")
 
 
 async def verify_jwt(
-    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
     settings: Settings = Depends(get_settings),
 ) -> Dict[str, Any]:
-    """
-    Validate the Supabase-issued JWT and return the decoded claims.
-
-    Raises:
-        HTTPException 401: If the token is missing, expired, or the
-            signature cannot be verified.
-
-    Returns:
-        The full decoded JWT payload dict, which typically contains::
-
-            {
-                "sub": "<user-uuid>",
-                "email": "...",
-                "role": "authenticated",
-                "app_metadata": {"role": "patient"},
-                "user_metadata": {...},
-                "exp": ...,
-                ...
-            }
-    """
+    """Validate Bearer token from headers."""
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Authorization header",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     token = credentials.credentials
     try:
         payload = jwt.decode(
@@ -60,7 +85,6 @@ async def verify_jwt(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Ensure the token carries a subject (user ID).
     if not payload.get("sub"):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
