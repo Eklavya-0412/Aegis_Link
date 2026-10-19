@@ -1,76 +1,96 @@
 # Aegis Link 🛡️
 
-**Intelligent Health Management System**
+**Intelligent Multi-Role Healthcare Management & Family Wellness System**
 
-Aegis Link is a comprehensive health management platform designed to bridge the gap between patients and their caregivers. With a focus on usability and aesthetics, it empowers patients to manage their health journey while providing caregivers with real-time insights and peace of mind.
+> For a complete, granular specification of all clinical capabilities, UML compliance, database models, and API endpoints, see the dedicated [APPLICATION_FEATURES.md](APPLICATION_FEATURES.md) document.
 
-## 🌟 Key Features
+---
 
-### For Patients
-*   **Medication Management**: Detailed tracking of medication schedules, dosages, and adherence.
-*   **Vital Monitoring**: Log and visualize key health metrics like Blood Pressure, Heart Rate, and Glucose levels.
-*   **Appointment Scheduler**: Keep track of upcoming doctor visits and medical appointments.
-*   **Emergency SOS**: Instantly notify caregivers with location and vital status in case of emergencies.
-*   **Caregiver Linking**: Securely connect with caregivers for remote monitoring.
+## 🌟 System Overview
 
-### For Caregivers
-*   **Patient Dashboard**: Centralized view of all linked patients and their health status.
-*   **Real-time Alerts**: Receive immediate notifications for missed medications or concerning vital signs.
-*   **Health Overview**: Access detailed reports on patient adherence and health trends.
+Aegis Link connects patients, physicians, professional caregivers, and family members into a unified, secure care ecosystem. It features continuous vital telemetry, automated anomaly alerts, granular consent gating, AES-256 encrypted health document vaults, and an intelligent clinical assistant.
 
-### Shared Features
-*   **Aegis Assistant**: An intelligent chatbot to help navigate the app and answer health management queries.
-*   **Secure Authentication**: Role-based access control for data privacy.
-*   **Modern UI**: Built with a focus on accessibility and user experience using Tailwind CSS.
+### 🎭 Core Roles & Capabilities
 
-## 🛠️ Tech Stack
+* **Patient Portal**:
+  * Continuous multi-metric vital tracking (Heart Rate, Blood Pressure, Glucose, SpO2, Temperature, Weight) with anomaly flags.
+  * Prescription adherence scheduler with time-slot tracking.
+  * One-touch Emergency SOS dispatch with real-time GPS telemetry and WebSocket alerts.
+  * Menstrual health tracking (cycle predictions, flow intensity, mood logs; gender-adaptive UI).
+  * Encrypted Health Document Vault (AES-256) and granular consent permissions.
+  * Health goals, wellness challenges, and rewards loyalty point redemption.
 
-*   **Frontend**: React 19, TypeScript
-*   **Styling**: Tailwind CSS
-*   **Icons**: Lucide React
-*   **Build Tool**: Create React App
+* **Doctor / Physician Portal**:
+  * Assigned patient census and clinical roster.
+  * **Granular Consent Verification Gate** (EXP6 Phase 2 compliance: restricts access to diagnostic data without active patient consent).
+  * Clinical Treatment & Dietary Plan authoring (diagnoses, DASH/cardiac diet guidelines, prescriptions, audit trails).
+  * Digital Prescription generation and encrypted laboratory review (CBC, metabolic, lipid panels).
 
-## 🚀 Getting Started
+* **Caregiver / Caretaker Portal**:
+  * Real-time patient monitoring dashboard with true mathematical adherence tracking.
+  * On-site patient check-in and visit logging (vitals, meds administered, clinician notes).
+  * Medication dosage adjustments with mandatory clinical reason and regulatory audit trail (EXP9 TC_06).
+  * Caregiver activity audit timeline and daily care task assignments.
 
-### Prerequisites
-*   Node.js (v14 or higher)
-*   npm or yarn
+* **Family Portal**:
+  * Multi-member health tracking and wellness leaderboards.
+  * Caregiver oversight and visit transparency feed (EXP2 UC12).
+  * Instant emergency notifications and SOS response coordination.
 
-### Installation
+* **AI Health Assistant & Clinical Intelligence Engine**:
+  * Conversational AI companion powered by Groq LLM (`llama-3.3-70b-versatile`) with live patient clinical context injection.
+  * Contextual clinical reasoning fallback engine for offline or rate-limited resilience.
+  * 4-step AI Symptom Checker & Triage Wizard.
+  * Longitudinal predictive health insights and risk level stratification.
 
-1.  Clone the repository:
-    ```bash
-    git clone [https://github.com/Eklavya-0412/Aegis-Link.git]
-    ```
-2.  Navigate to the project directory:
-    ```bash
-    cd aegis-link
-    ```
-3.  Install dependencies:
-    ```bash
-    npm install
-    ```
+---
 
-### Running the App
+## 🛠️ Technology Stack
 
-Start the development server:
+| Layer | Technologies |
+| :--- | :--- |
+| **Frontend** | React 19, TypeScript, Tailwind CSS, Lucide React, Zustand |
+| **Backend API** | Python 3.12+, FastAPI, Pydantic v2, Uvicorn |
+| **Database** | PostgreSQL / Supabase, SQL Migrations (`backend/migrations/`) |
+| **AI & NLP** | Groq API (`llama-3.3-70b`, `llama-3.1-8b`), Intelligent Clinical Fallback Engine |
+| **Security & Cryptography** | OAuth2 / JWT, Fernet AES-256 Encryption, Append-Only Audit Logging |
+| **Real-Time** | WebSockets (`/ws/alerts`), Live Telemetry Streaming |
+
+---
+
+## 🚀 Quick Start
+
+### 1. Unified Launch (Frontend + Backend)
+Run the automated launcher script from the project root:
 ```bash
+# Windows PowerShell
+.\launch.ps1
+
+# Or Windows Command Prompt / Batch
+launch.bat
+```
+
+### 2. Manual Startup
+
+#### Backend (FastAPI):
+```bash
+cd backend
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+API Documentation will be live at `http://localhost:8000/docs`.
+
+#### Frontend (React):
+```bash
+npm install
 npm start
 ```
-The application will open automatically in your browser at `http://localhost:3000`.
+The application will open at `http://localhost:3000`.
 
-## 📖 Usage Guide
+---
 
-1.  **Sign Up**: Create an account as a **Patient** or **Caregiver**.
-2.  **Patient Setup**:
-    *   Add your current medications and schedule appointments.
-    *   Log your latest vital signs.
-    *   Link a caregiver by entering their unique Caregiver ID.
-3.  **Caregiver Setup**:
-    *   Share your unique Caregiver ID with your patients.
-    *   Monitor their dashboard for updates and alerts.
+## 📖 In-Depth Feature Documentation
 
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
+For complete diagrams, UML compliance mapping (EXP2–EXP9), entity-relationship schemas, and full API route tables, refer to **[APPLICATION_FEATURES.md](APPLICATION_FEATURES.md)**.
