@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Shield } from 'lucide-react';
+import { History, Loader2, Lock, ShieldCheck, Users } from 'lucide-react';
 import { AuthFormData } from '../../services/authService';
+import { BrandMark } from '../../components/layout/AppSidebar';
 
 type AuthMode = 'login' | 'signup';
 
@@ -10,6 +11,12 @@ interface AuthFormProps {
   loading: boolean;
   onSubmit: (formData: AuthFormData) => Promise<void>;
 }
+
+const HIGHLIGHTS = [
+  { icon: Users, title: 'One record, four perspectives', text: 'Patients, physicians, caregivers and family each see what their role needs.' },
+  { icon: ShieldCheck, title: 'Consent-gated access', text: 'Sensitive records are shared only with the people a patient approves.' },
+  { icon: History, title: 'Traceable activity', text: 'Consent changes and document access are written to an activity log.' }
+];
 
 const AuthForm: React.FC<AuthFormProps> = ({ authMode, onAuthModeChange, loading, onSubmit }) => {
   const [formData, setFormData] = useState<AuthFormData>({
@@ -64,174 +71,233 @@ const AuthForm: React.FC<AuthFormProps> = ({ authMode, onAuthModeChange, loading
     await onSubmit(formData);
   };
 
+  const fieldError = (field: string) => (touched[field] && errors[field] ? errors[field] : '');
+
+  const renderError = (field: string) =>
+    fieldError(field) ? (
+      <p id={`${field}-error`} className="field-error" role="alert">
+        {fieldError(field)}
+      </p>
+    ) : null;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50/40 via-yellow-50/30 to-blue-50/40 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gradient-to-r from-blue-100/30 to-green-100/30 backdrop-blur-3xl" />
-      <div className="relative bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-blue-100 dark:border-gray-800 w-full max-w-lg transform transition-all duration-500">
-        <div className="text-center mb-8">
-          <div className="relative">
-            <Shield className="h-16 w-16 text-blue-600 dark:text-blue-400 mx-auto mb-4 drop-shadow-lg animate-pulse" />
-          </div>
-          <h1 className="text-4xl font-extrabold bg-gradient-to-r from-blue-700 to-emerald-700 dark:from-blue-400 dark:to-emerald-400 bg-clip-text text-transparent mb-2">
-            Aegis Link
-          </h1>
-          <p className="text-base text-gray-700 dark:text-gray-300 font-medium">Healthcare Coordination Platform</p>
+    <div className="flex min-h-screen bg-canvas dark:bg-slate-950">
+      {/* Brand panel */}
+      <aside className="relative hidden w-[44%] max-w-xl flex-col justify-between overflow-hidden bg-brand-600 p-10 text-white lg:flex">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)',
+            backgroundSize: '32px 32px'
+          }}
+          aria-hidden
+        />
+        <div className="relative flex items-center gap-2.5">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/20">
+            <ShieldCheck className="h-5 w-5" aria-hidden />
+          </span>
+          <span className="text-base font-semibold tracking-tight">Aegis Link</span>
         </div>
-
-        <div className="flex mb-6 bg-gray-100 dark:bg-gray-800 rounded-2xl p-1">
-          <button
-            type="button"
-            onClick={() => onAuthModeChange('login')}
-            className={`flex-1 min-h-[44px] py-3 text-center text-base rounded-xl transition-all duration-300 font-semibold ${
-              authMode === 'login'
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'text-gray-700 dark:text-gray-300 hover:text-blue-600'
-            }`}
-          >
-            Login
-          </button>
-          <button
-            type="button"
-            onClick={() => onAuthModeChange('signup')}
-            className={`flex-1 min-h-[44px] py-3 text-center text-base rounded-xl transition-all duration-300 font-semibold ${
-              authMode === 'signup'
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'text-gray-700 dark:text-gray-300 hover:text-blue-600'
-            }`}
-          >
-            Sign Up
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {authMode === 'signup' && (
-            <>
-              <div>
-                <input
-                  type="text"
-                  placeholder="Full Name"
-                  className={`w-full min-h-[44px] p-4 text-base border-2 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all ${
-                    touched.name && errors.name ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
-                  }`}
-                  value={formData.name}
-                  onChange={(e) => {
-                    setFormData({ ...formData, name: e.target.value });
-                    if (touched.name) validateField('name', e.target.value);
-                  }}
-                  onBlur={(e) => handleBlur('name', e.target.value)}
-                  required
-                />
-                {touched.name && errors.name && (
-                  <p className="text-xs text-red-600 font-medium mt-1 ml-1">{errors.name}</p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+        <div className="relative">
+          <h2 className="max-w-md text-3xl font-semibold leading-tight tracking-tight text-white">
+            Coordinated care, with the patient in control.
+          </h2>
+          <ul className="mt-8 space-y-5">
+            {HIGHLIGHTS.map((h) => (
+              <li key={h.title} className="flex gap-3.5">
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10">
+                  <h.icon className="h-4 w-4 text-brand-200" aria-hidden />
+                </span>
                 <div>
+                  <p className="text-sm font-medium text-white">{h.title}</p>
+                  <p className="text-13 leading-5 text-brand-100/80">{h.text}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <p className="relative text-xs text-brand-200/70">For care coordination. Not a substitute for emergency services.</p>
+      </aside>
+
+      {/* Form */}
+      <main className="flex flex-1 items-center justify-center px-4 py-10 sm:px-6">
+        <div className="w-full max-w-sm">
+          <div className="mb-8 lg:hidden">
+            <BrandMark />
+          </div>
+
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
+            {authMode === 'login' ? 'Sign in to your account' : 'Create your account'}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            {authMode === 'login' ? 'Welcome back. Enter your details to continue.' : 'Set up access for your role in the care team.'}
+          </p>
+
+          <div className="segmented mt-6 grid w-full grid-cols-2" role="tablist" aria-label="Authentication mode">
+            {(['login', 'signup'] as AuthMode[]).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                role="tab"
+                aria-selected={authMode === mode}
+                onClick={() => onAuthModeChange(mode)}
+                className={`segmented-item justify-center ${authMode === mode ? 'segmented-item-active' : ''}`}
+              >
+                {mode === 'login' ? 'Sign in' : 'Create account'}
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            {authMode === 'signup' && (
+              <>
+                <div>
+                  <label htmlFor="auth-name" className="label">
+                    Full name
+                  </label>
                   <input
-                    type="number"
-                    placeholder="Age"
-                    className={`w-full min-h-[44px] p-4 text-base border-2 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all ${
-                      touched.age && errors.age ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
-                    }`}
-                    value={formData.age}
+                    id="auth-name"
+                    type="text"
+                    autoComplete="name"
+                    className={`input ${fieldError('name') ? 'input-invalid' : ''}`}
+                    value={formData.name}
+                    aria-invalid={!!fieldError('name')}
+                    aria-describedby={fieldError('name') ? 'name-error' : undefined}
                     onChange={(e) => {
-                      setFormData({ ...formData, age: e.target.value });
-                      if (touched.age) validateField('age', e.target.value);
+                      setFormData({ ...formData, name: e.target.value });
+                      if (touched.name) validateField('name', e.target.value);
                     }}
-                    onBlur={(e) => handleBlur('age', e.target.value)}
+                    onBlur={(e) => handleBlur('name', e.target.value)}
                     required
                   />
-                  {touched.age && errors.age && (
-                    <p className="text-xs text-red-600 font-medium mt-1 ml-1">{errors.age}</p>
-                  )}
+                  {renderError('name')}
                 </div>
 
-                <select
-                  className="min-h-[44px] p-4 text-base border-2 border-gray-300 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all"
-                  value={formData.gender}
-                  onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                >
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                </select>
-              </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="auth-age" className="label">
+                      Age
+                    </label>
+                    <input
+                      id="auth-age"
+                      type="number"
+                      inputMode="numeric"
+                      className={`input tabular-nums ${fieldError('age') ? 'input-invalid' : ''}`}
+                      value={formData.age}
+                      aria-invalid={!!fieldError('age')}
+                      aria-describedby={fieldError('age') ? 'age-error' : undefined}
+                      onChange={(e) => {
+                        setFormData({ ...formData, age: e.target.value });
+                        if (touched.age) validateField('age', e.target.value);
+                      }}
+                      onBlur={(e) => handleBlur('age', e.target.value)}
+                      required
+                    />
+                    {renderError('age')}
+                  </div>
+                  <div>
+                    <label htmlFor="auth-gender" className="label">
+                      Sex
+                    </label>
+                    <select
+                      id="auth-gender"
+                      className="select"
+                      value={formData.gender}
+                      onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                    >
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                    </select>
+                  </div>
+                </div>
 
-              <select
-                className="w-full min-h-[44px] p-4 text-base border-2 border-gray-300 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all"
-                value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-              >
-                <option value="patient">Patient</option>
-                <option value="caregiver">Caregiver</option>
-                <option value="doctor">Doctor</option>
-              </select>
-            </>
-          )}
-
-          <div>
-            <input
-              type="email"
-              placeholder="Email Address"
-              className={`w-full min-h-[44px] p-4 text-base border-2 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all ${
-                touched.email && errors.email ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
-              }`}
-              value={formData.email}
-              onChange={(e) => {
-                setFormData({ ...formData, email: e.target.value });
-                if (touched.email) validateField('email', e.target.value);
-              }}
-              onBlur={(e) => handleBlur('email', e.target.value)}
-              required
-            />
-            {touched.email && errors.email && (
-              <p className="text-xs text-red-600 font-medium mt-1 ml-1">{errors.email}</p>
+                <div>
+                  <label htmlFor="auth-role" className="label">
+                    I am a…
+                  </label>
+                  <select
+                    id="auth-role"
+                    className="select"
+                    value={formData.role}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  >
+                    <option value="patient">Patient</option>
+                    <option value="caregiver">Professional caregiver</option>
+                    <option value="doctor">Physician</option>
+                  </select>
+                </div>
+              </>
             )}
+
+            <div>
+              <label htmlFor="auth-email" className="label">
+                Email address
+              </label>
+              <input
+                id="auth-email"
+                type="email"
+                autoComplete="email"
+                className={`input ${fieldError('email') ? 'input-invalid' : ''}`}
+                value={formData.email}
+                aria-invalid={!!fieldError('email')}
+                aria-describedby={fieldError('email') ? 'email-error' : undefined}
+                onChange={(e) => {
+                  setFormData({ ...formData, email: e.target.value });
+                  if (touched.email) validateField('email', e.target.value);
+                }}
+                onBlur={(e) => handleBlur('email', e.target.value)}
+                required
+              />
+              {renderError('email')}
+            </div>
+
+            <div>
+              <label htmlFor="auth-password" className="label">
+                Password
+              </label>
+              <input
+                id="auth-password"
+                type="password"
+                autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
+                className={`input ${fieldError('password') ? 'input-invalid' : ''}`}
+                value={formData.password}
+                aria-invalid={!!fieldError('password')}
+                aria-describedby={fieldError('password') ? 'password-error' : undefined}
+                onChange={(e) => {
+                  setFormData({ ...formData, password: e.target.value });
+                  if (touched.password) validateField('password', e.target.value);
+                }}
+                onBlur={(e) => handleBlur('password', e.target.value)}
+                required
+              />
+              {renderError('password')}
+            </div>
+
+            <button type="submit" disabled={loading} className="btn btn-primary btn-lg w-full">
+              {loading ? (
+                <>
+                  <Loader2 className="animate-spin" />
+                  {authMode === 'login' ? 'Signing in…' : 'Creating account…'}
+                </>
+              ) : authMode === 'login' ? (
+                'Sign in'
+              ) : (
+                'Create account'
+              )}
+            </button>
+          </form>
+
+          <div className="surface-muted mt-6 px-4 py-3">
+            <p className="text-xs font-medium text-slate-700 dark:text-slate-300">Demo accounts</p>
+            <p className="mt-1 font-mono text-2xs leading-5 text-slate-500">patient@demo.com · caregiver@demo.com · doctor@demo.com</p>
           </div>
 
-          <div>
-            <input
-              type="password"
-              placeholder="Password"
-              className={`w-full min-h-[44px] p-4 text-base border-2 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all ${
-                touched.password && errors.password ? 'border-red-500' : 'border-gray-300 dark:border-gray-700'
-              }`}
-              value={formData.password}
-              onChange={(e) => {
-                setFormData({ ...formData, password: e.target.value });
-                if (touched.password) validateField('password', e.target.value);
-              }}
-              onBlur={(e) => handleBlur('password', e.target.value)}
-              required
-            />
-            {touched.password && errors.password && (
-              <p className="text-xs text-red-600 font-medium mt-1 ml-1">{errors.password}</p>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full min-h-[48px] bg-gradient-to-r from-blue-600 to-emerald-600 text-white py-4 rounded-xl hover:from-blue-700 hover:to-emerald-700 transition-all duration-300 disabled:opacity-50 font-bold text-lg shadow-lg transform active:scale-95"
-          >
-            {loading ? (
-              <div className="flex items-center justify-center space-x-2">
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                <span>Processing...</span>
-              </div>
-            ) : authMode === 'login' ? (
-              'Login'
-            ) : (
-              'Sign Up'
-            )}
-          </button>
-        </form>
-
-        <div className="mt-6 text-center text-sm text-gray-700 dark:text-gray-300 bg-blue-50 dark:bg-gray-800 p-4 rounded-xl">
-          <p className="mb-1 font-semibold">Demo Accounts:</p>
-          <p className="text-xs">patient@demo.com | caregiver@demo.com | doctor@demo.com</p>
+          <p className="mt-6 flex items-center justify-center gap-1.5 text-xs text-slate-500">
+            <Lock className="h-3 w-3" aria-hidden />
+            Your session signs out automatically after inactivity.
+          </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 };

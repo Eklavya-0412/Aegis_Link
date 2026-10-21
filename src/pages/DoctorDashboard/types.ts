@@ -11,6 +11,8 @@ export interface LabResult {
   patient_name: string;
   test_date: string;
   ordered_by: string;
+  /** Built-in demonstration record, not loaded from the server. */
+  sample?: boolean;
   results: {
     cbc?: Record<string, LabPanelItem>;
     metabolic?: Record<string, LabPanelItem>;

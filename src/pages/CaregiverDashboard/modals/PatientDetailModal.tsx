@@ -1,7 +1,11 @@
 import React from 'react';
-import { XCircle } from 'lucide-react';
+import { Calendar, ClipboardList, HeartPulse, Pill, UserRound } from 'lucide-react';
 import { Appointment, Medication, User, Vital } from '../../../types';
-
+import Modal from '../../../components/common/Modal';
+import { EmptyState, KeyValue, StatusBadge } from '../../../components/ui';
+import { ReadingStatusBadge } from '../../../features/vitals/VitalReadingTile';
+import { sortByRecordedDesc, vitalLabel } from '../../../constants/vitals';
+import { formatDateTime } from '../../../utils/format';
 import { maskId } from '../../../utils/piiMasker';
 
 interface PatientDetailModalProps {
@@ -14,6 +18,14 @@ interface PatientDetailModalProps {
   onOpenManageMeds?: (patient: User) => void;
 }
 
+const SectionTitle: React.FC<{ icon: typeof Pill; children: React.ReactNode; count?: number }> = ({ icon: Icon, children, count }) => (
+  <h3 className="mb-2 flex items-center gap-2 text-13 font-semibold text-slate-800 dark:text-slate-200">
+    <Icon className="h-4 w-4 text-slate-400" aria-hidden />
+    {children}
+    {count !== undefined && <span className="font-normal tabular-nums text-slate-400">{count}</span>}
+  </h3>
+);
+
 export const PatientDetailModal: React.FC<PatientDetailModalProps> = ({
   patient,
   medications,
@@ -25,114 +37,134 @@ export const PatientDetailModal: React.FC<PatientDetailModalProps> = ({
 }) => {
   const patientMeds = medications.filter((m) => m.member_id === patient.user_id);
   const patientAppts = appointments.filter((a) => a.member_id === patient.user_id);
-  const patientVitals = vitals.filter((v) => v.member_id === patient.user_id).slice(0, 6);
+  const patientVitals = sortByRecordedDesc(vitals.filter((v) => v.member_id === patient.user_id)).slice(0, 6);
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white/95 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b flex items-center justify-between">
-          <div>
-            <h3 className="text-xl font-bold">{patient.name} • Details</h3>
-            <p className="text-sm text-gray-600">Age {patient.age} • {patient.gender}</p>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-            <XCircle className="h-6 w-6 text-gray-500" />
-          </button>
-        </div>
-        <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-1 space-y-4">
-            <div className="p-4 bg-blue-50 rounded-xl border">
-              <p className="text-xs text-gray-600">Patient ID</p>
-              <p className="font-mono font-bold text-blue-700">{maskId(patient.patient_id || patient.user_id)}</p>
-            </div>
-            <div className="p-4 bg-emerald-50 rounded-xl border">
-              <p className="text-xs text-gray-600">Medications</p>
-              <p className="font-bold text-emerald-700">{patientMeds.length}</p>
-            </div>
-            <div className="p-4 bg-purple-50 rounded-xl border">
-              <p className="text-xs text-gray-600">Appointments</p>
-              <p className="font-bold text-purple-700">{patientAppts.length}</p>
-            </div>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title={patient.name}
+      description={`${patient.age} y · ${patient.gender}`}
+      icon={UserRound}
+      maxWidth="max-w-3xl"
+      footer={
+        (onOpenCheckIn || onOpenManageMeds) && (
+          <>
+            {onOpenManageMeds && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  onClose();
+                  onOpenManageMeds(patient);
+                }}
+              >
+                <Pill />
+                Manage medications
+              </button>
+            )}
+            {onOpenCheckIn && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  onClose();
+                  onOpenCheckIn(patient.user_id);
+                }}
+              >
+                <ClipboardList />
+                Log visit
+              </button>
+            )}
+          </>
+        )
+      }
+    >
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-[200px_minmax(0,1fr)]">
+        <dl className="h-fit divide-y divide-slate-100 rounded-lg border border-slate-200 px-3 dark:divide-slate-800 dark:border-slate-800">
+          <KeyValue label="Patient ID" mono>
+            {maskId(patient.patient_id || patient.user_id)}
+          </KeyValue>
+          <KeyValue label="Medications">{patientMeds.length}</KeyValue>
+          <KeyValue label="Appointments">{patientAppts.length}</KeyValue>
+        </dl>
 
-            <div className="space-y-2 pt-2">
-              {onOpenCheckIn && (
-                <button
-                  onClick={() => {
-                    onClose();
-                    onOpenCheckIn(patient.user_id);
-                  }}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-xl text-xs font-semibold shadow transition"
-                >
-                  Log Visit Check-In
-                </button>
-              )}
-              {onOpenManageMeds && (
-                <button
-                  onClick={() => {
-                    onClose();
-                    onOpenManageMeds(patient);
-                  }}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-xl text-xs font-semibold shadow transition"
-                >
-                  Manage Medications
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="md:col-span-2 space-y-6">
-            <div className="bg-white/70 p-4 rounded-xl border">
-              <h4 className="font-bold mb-3">Recent Vitals</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {patientVitals.map((v) => (
-                  <div key={v.id} className="p-3 bg-gray-50 rounded-xl border">
-                    <p className="font-semibold text-gray-800">{v.type.toUpperCase()} • {v.value} {v.unit}</p>
-                    <p className="text-xs text-gray-500">{new Date(v.recorded_at).toLocaleString()}</p>
-                  </div>
-                ))}
-                {patientVitals.length === 0 && (
-                  <p className="text-sm text-gray-500">No vitals available</p>
-                )}
+        <div className="space-y-6">
+          <section>
+            <SectionTitle icon={HeartPulse} count={patientVitals.length}>
+              Recent vital signs
+            </SectionTitle>
+            {patientVitals.length === 0 ? (
+              <EmptyState compact title="No vitals recorded" />
+            ) : (
+              <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
+                <table className="data-table">
+                  <tbody>
+                    {patientVitals.map((v) => (
+                      <tr key={v.id}>
+                        <td className="font-medium text-slate-800 dark:text-slate-200">{vitalLabel(v.type)}</td>
+                        <td className="whitespace-nowrap tabular-nums">
+                          <span className="font-semibold text-slate-900 dark:text-slate-100">{v.value}</span>{' '}
+                          <span className="text-xs text-slate-500">{v.unit}</span>
+                        </td>
+                        <td className="hidden whitespace-nowrap text-xs tabular-nums text-slate-500 sm:table-cell">{formatDateTime(v.recorded_at)}</td>
+                        <td className="text-right">
+                          <ReadingStatusBadge vital={v} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
-            <div className="bg-white/70 p-4 rounded-xl border">
-              <h4 className="font-bold mb-3">Medications</h4>
-              <div className="space-y-2">
+            )}
+          </section>
+
+          <section>
+            <SectionTitle icon={Pill} count={patientMeds.length}>
+              Medications
+            </SectionTitle>
+            {patientMeds.length === 0 ? (
+              <EmptyState compact title="No medications" />
+            ) : (
+              <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
                 {patientMeds.map((m) => (
-                  <div key={m.id} className="p-3 bg-gray-50 rounded-xl border flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-gray-800">{m.name}</p>
-                      <p className="text-xs text-gray-600">{m.dosage} • {m.frequency}</p>
+                  <li key={m.id} className="flex items-center gap-3 px-3 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-13 font-medium text-slate-900 dark:text-slate-100">{m.name}</p>
+                      <p className="text-xs capitalize text-slate-500">
+                        {m.dosage} · {m.frequency}
+                      </p>
                     </div>
-                    <span className={`text-xs px-2 py-1 rounded-full ${m.taken_today ? 'bg-emerald-100 text-emerald-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                      {m.taken_today ? 'Taken' : 'Due'}
-                    </span>
-                  </div>
+                    <StatusBadge severity={m.taken_today ? 'success' : 'warning'}>{m.taken_today ? 'Taken' : 'Due'}</StatusBadge>
+                  </li>
                 ))}
-                {patientMeds.length === 0 && (
-                  <p className="text-sm text-gray-500">No medications</p>
-                )}
-              </div>
-            </div>
-            <div className="bg-white/70 p-4 rounded-xl border">
-              <h4 className="font-bold mb-3">Appointments</h4>
-              <div className="space-y-2">
+              </ul>
+            )}
+          </section>
+
+          <section>
+            <SectionTitle icon={Calendar} count={patientAppts.length}>
+              Appointments
+            </SectionTitle>
+            {patientAppts.length === 0 ? (
+              <EmptyState compact title="No appointments" />
+            ) : (
+              <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
                 {patientAppts.map((a) => (
-                  <div key={a.id} className="p-3 bg-gray-50 rounded-xl border">
-                    <p className="font-semibold text-gray-800">{a.title}</p>
-                    <p className="text-xs text-gray-600">{new Date(a.appointment_date).toLocaleString()} • {a.type}</p>
-                  </div>
+                  <li key={a.id} className="px-3 py-2.5">
+                    <p className="text-13 font-medium text-slate-900 dark:text-slate-100">{a.title}</p>
+                    <p className="text-xs tabular-nums text-slate-500">
+                      {formatDateTime(a.appointment_date)} · <span className="capitalize">{a.type.replace('_', ' ')}</span>
+                    </p>
+                  </li>
                 ))}
-                {patientAppts.length === 0 && (
-                  <p className="text-sm text-gray-500">No appointments</p>
-                )}
-              </div>
-            </div>
-          </div>
+              </ul>
+            )}
+          </section>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };
 
 export default PatientDetailModal;
-

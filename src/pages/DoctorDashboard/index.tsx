@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle2, FileText, Lock, ShieldCheck, Stethoscope, Video } from 'lucide-react';
+import { FileText, Loader2, Lock, ShieldCheck, Video } from 'lucide-react';
+import { PageHeader } from '../../components/ui';
+import { describeApiError } from '../../services/governanceService';
 import { Appointment, Family, Medication, User, Vital } from '../../types';
 import { LabResult } from './types';
 import DoctorOverviewTab from './tabs/DoctorOverviewTab';
@@ -33,6 +35,7 @@ export interface DoctorDashboardProps {
 const INITIAL_LAB_RESULTS: LabResult[] = [
   {
     id: 'lab_01',
+    sample: true,
     patient_id: 'user1',
     patient_name: 'Priya Sharma',
     test_date: '2025-09-10T10:30:00',
@@ -62,6 +65,7 @@ const INITIAL_LAB_RESULTS: LabResult[] = [
   },
   {
     id: 'lab_02',
+    sample: true,
     patient_id: 'user2',
     patient_name: 'Arjun Mehta',
     test_date: '2025-09-08T14:15:00',
@@ -113,6 +117,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
   const [plans, setPlans] = useState<TreatmentPlanItem[]>([
     {
       id: 'tp_01',
+      sample: true,
       patient_id: allPatients[0]?.user_id || 'p1',
       title: 'Hypertension Management & Glycemic Stabilization',
       diagnosis: 'Stage 1 Hypertension & Impaired Fasting Glucose',
@@ -182,10 +187,13 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
     try {
       await grantAccessConsent(selectedPatient.user_id, currentUser.user_id, '*');
       setHasConsent(true);
-      showToast(`Access consent granted by ${selectedPatient.name} (EXP6 Phase 2).`, 'success');
+      showToast(`Access consent granted by ${selectedPatient.name}.`, 'success');
     } catch (err) {
-      setHasConsent(true);
-      showToast('Consent verified for clinical review session.', 'success');
+      // The server only accepts consent granted by the patient themself; never show access as granted when it refused.
+      showToast(
+        `Consent was not recorded: ${describeApiError(err).message} ${selectedPatient.name} can grant access from their Consent & access page.`,
+        'warning'
+      );
     }
   };
 
@@ -233,7 +241,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
       };
 
       setPlans((prev) => [newPlanItem, ...prev]);
-      showToast(`Treatment plan created for ${patient.name}. Audit logged.`, 'success');
+      showToast(`Treatment plan saved for ${patient.name}.`, 'success');
     } catch (err) {
       // Fallback
       const newPlanItem: TreatmentPlanItem = {
@@ -247,7 +255,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
         created_at: new Date().toISOString()
       };
       setPlans((prev) => [newPlanItem, ...prev]);
-      showToast(`Treatment plan created for ${patient.name}. Audit logged.`, 'success');
+      showToast(`Treatment plan for ${patient.name} saved on this device only — the server could not be reached.`, 'warning');
     }
   };
 
@@ -281,7 +289,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
       };
 
       setMedications((prev) => [newMed, ...prev]);
-      showToast(`Prescribed ${data.medication} (${data.dosage}) for ${targetPatient.name}. Cryptographic audit logged.`, 'success');
+      showToast(`Prescribed ${data.medication} (${data.dosage}) for ${targetPatient.name}. Recorded in the activity log.`, 'success');
     } catch (err) {
       const newMed: Medication = {
         id: `med_${Date.now()}`,
@@ -295,111 +303,96 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
         member_id: targetPatient.user_id
       };
       setMedications((prev) => [newMed, ...prev]);
-      showToast(`Prescription dispatched for ${targetPatient.name}. Audit logged.`, 'success');
+      showToast(`Prescription for ${targetPatient.name} saved on this device only — the server could not be reached.`, 'warning');
     }
   };
 
+  const TAB_HEADINGS: Record<string, { title: string; description: string }> = {
+    dashboard: { title: 'Clinical overview', description: 'Vital-sign trends, flagged readings and prescriptions for the patient in focus.' },
+    patients: { title: 'Patients', description: 'Your patient panel. Select a patient to bring them into focus.' },
+    treatments: { title: 'Treatment plans', description: 'Treatment and dietary plans, newest first.' },
+    telemedicine: { title: 'Telemedicine', description: 'Scheduled video consultations.' }
+  };
+  const heading = TAB_HEADINGS[activeTab] || TAB_HEADINGS.dashboard;
+
   return (
-    <div className="space-y-8">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 p-6 rounded-3xl text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-2xl font-bold tracking-tight">Physician Clinical Command Station</h2>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/40 border border-blue-400/50">
-              Licensed MD
-            </span>
-          </div>
-          <p className="text-sm text-blue-100 mt-1">
-            Treatments & Diet Directives (UC8), Decrypted Diagnostic Vault (UC9), Telemedicine
-          </p>
-        </div>
+    <div className="page">
+      <PageHeader
+        eyebrow="Clinical workspace"
+        title={heading.title}
+        description={heading.description}
+        actions={
+          <>
+            <button type="button" onClick={() => setShowCreatePlan(true)} className="btn btn-secondary">
+              <FileText />
+              New treatment plan
+            </button>
+            <button type="button" onClick={onOpenTelemedicine} className="btn btn-primary">
+              <Video />
+              Start video visit
+            </button>
+          </>
+        }
+      />
 
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={onOpenTelemedicine}
-            className="bg-white/10 hover:bg-white/20 border border-white/30 text-white px-4 py-2.5 rounded-2xl transition font-semibold text-sm shadow-md flex items-center gap-2 active:scale-95"
-          >
-            <Video className="h-4 w-4 text-emerald-300" />
-            Attend Video Consult
-          </button>
-          <button
-            onClick={() => setShowCreatePlan(true)}
-            className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-5 py-2.5 rounded-2xl transition font-semibold text-sm shadow-md flex items-center gap-2 active:scale-95"
-          >
-            <FileText className="h-4 w-4" />
-            + New Treatment Plan (UC8)
-          </button>
-        </div>
-      </div>
-
-      {/* Patient Selector Bar */}
-      <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl p-4 rounded-3xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center space-x-3">
-          <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
-            Active Patient:
-          </span>
+      {/* Patient in focus + consent status */}
+      <div className="card flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <label htmlFor="doctor-patient-focus" className="text-13 font-medium text-slate-600 dark:text-slate-300">
+            Patient in focus
+          </label>
           <select
-            className="p-2.5 border rounded-2xl text-sm font-semibold bg-gray-50 dark:bg-gray-700 dark:border-gray-600 text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-blue-500"
+            id="doctor-patient-focus"
+            className="select input-sm sm:w-64"
             value={selectedPatient?.user_id || ''}
             onChange={(e) => setSelectedPatient(allPatients.find((m) => m.user_id === e.target.value) || null)}
           >
+            {allPatients.length === 0 && <option value="">No patients</option>}
             {allPatients.map((m) => (
               <option key={m.user_id} value={m.user_id}>
-                {m.name} ({m.age}y, {m.gender})
+                {m.name} ({m.age} y, {m.gender})
               </option>
             ))}
           </select>
         </div>
-
-        {/* Consent Badge / Barrier Status */}
-        <div className="flex items-center gap-2 text-xs">
-          {hasConsent ? (
-            <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-full font-semibold">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              Patient Consent Active & Verified
+        <div className="md:ml-auto" aria-live="polite">
+          {checkingConsent ? (
+            <span className="badge badge-neutral">
+              <Loader2 className="animate-spin" aria-hidden />
+              Checking consent…
+            </span>
+          ) : hasConsent ? (
+            <span className="badge badge-success">
+              <ShieldCheck aria-hidden />
+              Patient consent on file
             </span>
           ) : (
-            <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800 rounded-full font-semibold">
-                <Lock className="w-3.5 h-3.5 text-amber-600" />
-                Consent Verification Required (EXP6)
-              </span>
-              <button
-                onClick={handleGrantConsentSimulation}
-                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-semibold transition"
-              >
-                Grant Access Consent
-              </button>
-            </div>
+            <span className="badge badge-warning">
+              <Lock aria-hidden />
+              Consent required
+            </span>
           )}
         </div>
       </div>
 
-      {/* Consent Barrier Alert (if consent revoked) */}
-      {!hasConsent && (
-        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-6 rounded-3xl flex items-start gap-4">
-          <AlertCircle className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
-          <div className="space-y-2">
-            <h4 className="font-bold text-amber-900 dark:text-amber-200">
-              Access Consent Verification Required (Sequence Diagram Phase 2)
-            </h4>
-            <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
-              In accordance with HIPAA and the Aegis Link Boundary-Control-Entity security specification,
-              attending doctors must obtain explicit patient consent prior to accessing diagnostic documents,
-              vitals history, and reproductive records.
+      {!hasConsent && !checkingConsent && selectedPatient && (
+        <div className="callout callout-warning" role="alert">
+          <Lock aria-hidden />
+          <div className="flex-1">
+            <p className="font-medium">{selectedPatient.name} hasn't granted you access to their record</p>
+            <p className="mt-0.5">
+              Diagnostic documents, vital-sign history and reproductive records require the patient's explicit consent. The server
+              enforces this on every request.
             </p>
-            <button
-              onClick={handleGrantConsentSimulation}
-              className="mt-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
-            >
-              Simulate Patient Authorization Grant
+            <button type="button" onClick={handleGrantConsentSimulation} className="btn btn-secondary btn-sm mt-3">
+              Simulate patient authorization (demo)
             </button>
           </div>
         </div>
       )}
 
-      {showCreatePlan && (
+      {/* The treatments tab renders its own plan modal; avoid opening two. */}
+      {showCreatePlan && activeTab !== 'treatments' && (
         <CreatePlanModal
           patients={allPatients}
           selectedPatient={selectedPatient}

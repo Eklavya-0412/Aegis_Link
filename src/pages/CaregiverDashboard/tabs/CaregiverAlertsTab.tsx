@@ -6,28 +6,17 @@ import AlertsPanel from '../components/AlertsPanel';
 interface CaregiverAlertsTabProps {
   patients: CaregiverPatient[];
   alerts: AlertItem[];
-  adherenceRateData: number[];
+  adherenceRateData: (number | null)[];
   onAcknowledgeAlert: (alertId: string) => void;
 }
 
-export const CaregiverAlertsTab: React.FC<CaregiverAlertsTabProps> = ({
-  patients,
-  alerts,
-  adherenceRateData,
-  onAcknowledgeAlert
-}) => {
+export const CaregiverAlertsTab: React.FC<CaregiverAlertsTabProps> = ({ patients, alerts, adherenceRateData, onAcknowledgeAlert }) => {
   return (
-    <div className="space-y-8">
-      <h2 className="text-3xl font-bold text-gray-800">Patient Alerts</h2>
-      <CaregiverCharts
-        patients={patients}
-        alerts={alerts}
-        adherenceRateData={adherenceRateData}
-      />
-      <AlertsPanel alerts={alerts} onAcknowledgeAlert={onAcknowledgeAlert} />
+    <div className="space-y-6">
+      <AlertsPanel title="All alerts" alerts={alerts} onAcknowledgeAlert={onAcknowledgeAlert} />
+      <CaregiverCharts patients={patients} alerts={alerts} adherenceRateData={adherenceRateData} />
     </div>
   );
 };
 
 export default CaregiverAlertsTab;
-

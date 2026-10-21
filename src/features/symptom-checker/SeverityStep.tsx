@@ -8,71 +8,47 @@ interface SeverityStepProps {
   onNext: () => void;
 }
 
-export const SeverityStep: React.FC<SeverityStepProps> = ({
-  symptomSeverity,
-  setSymptomSeverity,
-  onBack,
-  onNext
-}) => {
+const describe = (n: number) => (n <= 3 ? 'Mild' : n <= 6 ? 'Moderate' : 'Severe');
+
+export const SeverityStep: React.FC<SeverityStepProps> = ({ symptomSeverity, setSymptomSeverity, onBack, onNext }) => {
+  const tone = symptomSeverity <= 3 ? 'badge-success' : symptomSeverity <= 6 ? 'badge-warning' : 'badge-danger';
   return (
-    <motion.div
-      key="step2"
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -6 }}
-      transition={{ duration: 0.25 }}
-    >
-      <h4 className="text-xl font-bold mb-6 text-gray-800">Symptom Severity Assessment</h4>
-      <div className="mb-6">
-        <p className="text-gray-600 mb-4">Rate your symptom intensity (1-10):</p>
-        <div className="flex items-center space-x-4">
-          <span className="text-sm text-gray-500">Mild (1)</span>
-          <input
-            type="range"
-            min="1"
-            max="10"
-            value={symptomSeverity}
-            onChange={(e) => setSymptomSeverity(parseInt(e.target.value))}
-            className="flex-1 h-2 bg-gradient-to-r from-green-400 via-yellow-400 to-red-400 rounded-lg appearance-none slider"
-          />
-          <span className="text-sm text-gray-500">Severe (10)</span>
-        </div>
-        <div className="text-center mt-2">
-          <span
-            className={`text-2xl font-bold ${
-              symptomSeverity <= 3
-                ? 'text-green-600'
-                : symptomSeverity <= 6
-                ? 'text-yellow-600'
-                : 'text-red-600'
-            }`}
-          >
-            {symptomSeverity}/10
-          </span>
+    <motion.div key="step2" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+      <h3 className="section-title">How intense are your symptoms?</h3>
+      <p className="mt-0.5 text-13 text-slate-500">1 is barely noticeable, 10 is the worst you can imagine.</p>
+
+      <div className="mt-8 flex items-baseline justify-center gap-3">
+        <span className="text-4xl font-semibold tabular-nums text-slate-900 dark:text-slate-50">{symptomSeverity}</span>
+        <span className="text-sm text-slate-500">/ 10</span>
+        <span className={`badge ${tone}`}>{describe(symptomSeverity)}</span>
+      </div>
+
+      <div className="mx-auto mt-6 max-w-md">
+        <input
+          type="range"
+          min="1"
+          max="10"
+          value={symptomSeverity}
+          onChange={(e) => setSymptomSeverity(parseInt(e.target.value))}
+          className="w-full"
+          aria-label="Symptom severity from 1 to 10"
+          aria-valuetext={`${symptomSeverity} out of 10, ${describe(symptomSeverity)}`}
+        />
+        <div className="mt-1 flex justify-between text-xs text-slate-500">
+          <span>Mild</span>
+          <span>Moderate</span>
+          <span>Severe</span>
         </div>
       </div>
 
-      <div className="flex justify-between">
-        <button
-          onClick={onBack}
-          className="px-4 py-3 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
-        >
+      <div className="mt-8 flex justify-between border-t border-slate-100 pt-4 dark:border-slate-800">
+        <button type="button" onClick={onBack} className="btn btn-secondary">
           Back
         </button>
-        <motion.button
-          onClick={onNext}
-          className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-semibold text-lg hover:from-purple-600 hover:to-pink-600 transition-all duration-300 shadow-lg"
-          whileHover={{
-            scale: 1.05,
-            boxShadow:
-              '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-          }}
-          whileTap={{ scale: 0.95 }}
-        >
-          Next: Duration
-        </motion.button>
+        <button type="button" onClick={onNext} className="btn btn-primary">
+          Continue
+        </button>
       </div>
     </motion.div>
   );
 };
-

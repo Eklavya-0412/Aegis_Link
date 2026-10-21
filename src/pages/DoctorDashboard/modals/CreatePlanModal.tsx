@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Apple, FileText, Pill, Stethoscope, XCircle } from 'lucide-react';
+import { FilePlus2 } from 'lucide-react';
 import { User } from '../../../types';
+import Modal from '../../../components/common/Modal';
+import { Field } from '../../../components/ui';
 
 interface CreatePlanModalProps {
   patients: User[];
@@ -10,13 +12,7 @@ interface CreatePlanModalProps {
   onClose: () => void;
 }
 
-export const CreatePlanModal: React.FC<CreatePlanModalProps> = ({
-  patients,
-  selectedPatient,
-  onSelectPatient,
-  onCreatePlan,
-  onClose
-}) => {
+export const CreatePlanModal: React.FC<CreatePlanModalProps> = ({ patients, selectedPatient, onSelectPatient, onCreatePlan, onClose }) => {
   const [title, setTitle] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
   const [planDetails, setPlanDetails] = useState('');
@@ -35,118 +31,82 @@ export const CreatePlanModal: React.FC<CreatePlanModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white/95 dark:bg-gray-900/95 rounded-3xl shadow-2xl max-w-2xl w-full border border-purple-100 dark:border-gray-800 overflow-hidden">
-        <div className="bg-gradient-to-r from-purple-600 via-indigo-600 to-pink-600 p-5 text-white flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Stethoscope className="w-6 h-6" />
-            <div>
-              <h3 className="font-bold text-lg">Establish Treatment & Diet Plan (UC8)</h3>
-              <p className="text-xs text-purple-100">Clinical recommendations, dietary directives, and therapy adjustments</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-xl transition text-white/80 hover:text-white">
-            <XCircle className="w-6 h-6" />
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="New treatment plan"
+      description="Treatment directives and dietary guidance. Plans are attributed to you and time-stamped."
+      icon={FilePlus2}
+      maxWidth="max-w-2xl"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className="btn btn-secondary">
+            Cancel
           </button>
+          <button type="submit" form="create-plan-form" disabled={!selectedPatient || !planDetails.trim()} className="btn btn-primary">
+            Save plan
+          </button>
+        </>
+      }
+    >
+      <form id="create-plan-form" onSubmit={handleSubmit} className="space-y-4">
+        <Field label="Patient" htmlFor="plan-patient" required>
+          <select
+            id="plan-patient"
+            className="select"
+            value={selectedPatient?.user_id || ''}
+            onChange={(e) => {
+              const patient = patients.find((m) => m.user_id === e.target.value);
+              onSelectPatient(patient || null);
+            }}
+            required
+          >
+            <option value="">Select a patient</option>
+            {patients.map((member) => (
+              <option key={member.user_id} value={member.user_id}>
+                {member.name} ({member.relationship || member.role})
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Plan title" htmlFor="plan-title">
+            <input
+              id="plan-title"
+              className="input"
+              placeholder="e.g. Hypertension management"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </Field>
+          <Field label="Diagnosis / indication" htmlFor="plan-dx">
+            <input
+              id="plan-dx"
+              className="input"
+              placeholder="e.g. Stage 1 essential hypertension"
+              value={diagnosis}
+              onChange={(e) => setDiagnosis(e.target.value)}
+            />
+          </Field>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-              Select Patient *
-            </label>
-            <select
-              className="w-full p-2.5 border rounded-xl text-sm bg-gray-50 dark:bg-gray-800 dark:border-gray-700 focus:ring-2 focus:ring-purple-500"
-              value={selectedPatient?.user_id || ''}
-              onChange={(e) => {
-                const patient = patients.find((m) => m.user_id === e.target.value);
-                onSelectPatient(patient || null);
-              }}
-              required
-            >
-              <option value="">Select Patient</option>
-              {patients.map((member) => (
-                <option key={member.user_id} value={member.user_id}>
-                  {member.name} ({member.relationship || member.role})
-                </option>
-              ))}
-            </select>
-          </div>
+        <Field label="Treatment directives" htmlFor="plan-details" required helper="Goals, medication titration, monitoring intervals and follow-up timeline.">
+          <textarea
+            id="plan-details"
+            className="textarea"
+            rows={5}
+            value={planDetails}
+            onChange={(e) => setPlanDetails(e.target.value)}
+            required
+          />
+        </Field>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                Plan Title
-              </label>
-              <input
-                className="w-full p-2.5 border rounded-xl text-sm bg-gray-50 dark:bg-gray-800 dark:border-gray-700 focus:ring-2 focus:ring-purple-500"
-                placeholder="e.g. Hypertension & Glycemic Optimization"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                Diagnosis / Indication
-              </label>
-              <input
-                className="w-full p-2.5 border rounded-xl text-sm bg-gray-50 dark:bg-gray-800 dark:border-gray-700 focus:ring-2 focus:ring-purple-500"
-                placeholder="e.g. Stage 1 Essential Hypertension"
-                value={diagnosis}
-                onChange={(e) => setDiagnosis(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
-              <FileText className="w-3.5 h-3.5 text-purple-500" />
-              Clinical Treatment Directives & Therapy Adjustments *
-            </label>
-            <textarea
-              className="w-full p-3 border rounded-xl text-sm bg-gray-50 dark:bg-gray-800 dark:border-gray-700 focus:ring-2 focus:ring-purple-500"
-              rows={4}
-              placeholder="Detail medical goals, medication titration, required diagnostic intervals, and follow-up timeline..."
-              value={planDetails}
-              onChange={(e) => setPlanDetails(e.target.value)}
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
-              <Apple className="w-3.5 h-3.5 text-emerald-500" />
-              Dietary & Nutritional Recommendations (UC8)
-            </label>
-            <textarea
-              className="w-full p-3 border rounded-xl text-sm bg-gray-50 dark:bg-gray-800 dark:border-gray-700 focus:ring-2 focus:ring-purple-500"
-              rows={3}
-              placeholder="Specific dietary guidelines (e.g. DASH protocol, sodium limits, glycemic control, hydration requirements)..."
-              value={dietaryGuidelines}
-              onChange={(e) => setDietaryGuidelines(e.target.value)}
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 dark:text-gray-300 hover:bg-gray-100 text-sm font-medium transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={!selectedPatient || !planDetails.trim()}
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-semibold hover:from-purple-700 hover:to-pink-700 transition shadow-md disabled:opacity-50"
-            >
-              Save Treatment Plan
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <Field label="Diet & lifestyle guidance" htmlFor="plan-diet" helper="Optional — e.g. DASH diet, sodium limits, hydration.">
+          <textarea id="plan-diet" className="textarea" rows={3} value={dietaryGuidelines} onChange={(e) => setDietaryGuidelines(e.target.value)} />
+        </Field>
+      </form>
+    </Modal>
   );
 };
 

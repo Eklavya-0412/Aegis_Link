@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, Clock, LogOut } from 'lucide-react';
+import { Clock, LogOut } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
 interface IdleWarningModalProps {
@@ -11,38 +11,36 @@ export const IdleWarningModal: React.FC<IdleWarningModalProps> = ({ secondsRemai
   const { logout } = useAuthStore();
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 z-[9999]">
-      <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 max-w-md w-full shadow-2xl border border-yellow-200 dark:border-yellow-900 text-center animate-in fade-in zoom-in duration-200">
-        <div className="h-16 w-16 bg-amber-100 dark:bg-amber-950/80 rounded-2xl flex items-center justify-center mx-auto mb-6">
-          <AlertTriangle className="h-10 w-10 text-amber-600 dark:text-amber-400 animate-pulse" />
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]">
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="idle-title"
+        aria-describedby="idle-desc"
+        className="w-full max-w-sm overflow-hidden rounded-xl border border-slate-200 bg-white shadow-pop dark:border-slate-800 dark:bg-slate-900"
+      >
+        <div className="px-5 pb-5 pt-6 text-center">
+          <span className="icon-tile mx-auto mb-4 h-11 w-11 bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400">
+            <Clock aria-hidden />
+          </span>
+          <h2 id="idle-title" className="text-base font-semibold text-slate-900 dark:text-slate-50">
+            Your session is about to expire
+          </h2>
+          <p id="idle-desc" className="mt-1.5 text-sm text-slate-600 dark:text-slate-400">
+            For your privacy, you'll be signed out automatically after a period of inactivity.
+          </p>
+          <p className="mt-4 text-3xl font-semibold tabular-nums text-slate-900 dark:text-slate-50" aria-live="polite">
+            0:{String(Math.max(0, secondsRemaining)).padStart(2, '0')}
+          </p>
+          <p className="text-xs text-slate-500">remaining</p>
         </div>
-
-        <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
-          Session Expiring Soon
-        </h3>
-
-        <p className="text-base text-gray-700 dark:text-gray-300 mb-6 leading-relaxed">
-          You have been inactive for a while. For your security and privacy, you will be automatically logged out in:
-        </p>
-
-        <div className="inline-flex items-center justify-center space-x-2 bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 px-6 py-3 rounded-2xl border border-amber-200 dark:border-amber-800 mb-8">
-          <Clock className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-          <span className="text-3xl font-extrabold tracking-wider">{secondsRemaining}s</span>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button
-            onClick={onExtend}
-            className="flex-1 min-h-[48px] px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-base rounded-xl shadow-lg transition-all transform active:scale-95 focus:ring-4 focus:ring-blue-300"
-          >
-            Stay Logged In
+        <div className="flex gap-2 border-t border-slate-100 bg-slate-50/60 px-5 py-3 dark:border-slate-800 dark:bg-slate-900">
+          <button type="button" onClick={() => logout()} className="btn btn-secondary flex-1">
+            <LogOut />
+            Sign out
           </button>
-          <button
-            onClick={() => logout()}
-            className="min-h-[48px] px-5 py-3 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold text-base rounded-xl transition-all flex items-center justify-center space-x-2"
-          >
-            <LogOut className="h-5 w-5" />
-            <span>Log Out</span>
+          <button type="button" onClick={onExtend} className="btn btn-primary flex-1" autoFocus>
+            Stay signed in
           </button>
         </div>
       </div>

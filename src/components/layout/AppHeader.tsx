@@ -1,118 +1,153 @@
 import React from 'react';
-import { Activity, Gift, Moon, Shield, ShoppingCart, Sun, Video } from 'lucide-react';
+import { Gift, Menu, Moon, ShoppingBag, Stethoscope, Sun, Video } from 'lucide-react';
 import { Family, User } from '../../types';
 import { useThemeStore } from '../../store/themeStore';
+import { roleLabel } from '../../utils/format';
+import { BrandMark } from './AppSidebar';
 
 interface AppHeaderProps {
   currentUser: User | null;
   currentFamily: Family | null;
   selectedMember: User | null;
+  sectionLabel: string;
+  onSelectMember: (member: User) => void;
   onOpenSymptomChecker: () => void;
   onOpenTelemedicine: () => void;
   onOpenTelepharmacy: () => void;
   onOpenPointsStore: () => void;
-  onLogout: () => void;
+  onOpenMobileNav: () => void;
 }
+
+const HeaderIconButton: React.FC<{ label: string; onClick: () => void; children: React.ReactNode }> = ({
+  label,
+  onClick,
+  children
+}) => (
+  <button type="button" onClick={onClick} className="btn btn-ghost btn-icon" aria-label={label} title={label}>
+    {children}
+  </button>
+);
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
   currentUser,
   currentFamily,
   selectedMember,
+  sectionLabel,
+  onSelectMember,
   onOpenSymptomChecker,
   onOpenTelemedicine,
   onOpenTelepharmacy,
   onOpenPointsStore,
-  onLogout
+  onOpenMobileNav
 }) => {
   const isDoctor = currentUser?.role === 'doctor';
   const isCaregiver = currentUser?.role === 'caregiver';
+  const isPersonal = !isDoctor && !isCaregiver;
   const { theme, toggleTheme } = useThemeStore();
 
+  // Member switching is only available to family members viewing a shared family (unchanged behaviour).
+  const canSwitchMember =
+    currentUser?.role === 'family_member' && !!currentFamily && currentFamily.members.length > 1;
+
+  const contextLabel = isPersonal ? currentFamily?.family_name : roleLabel(currentUser?.role);
+
   return (
-    <header className="bg-gradient-to-r from-white/90 to-blue-50/80 dark:from-gray-900/90 dark:to-gray-800/90 backdrop-blur-xl shadow-lg border-b border-blue-200/50 dark:border-gray-800 sticky top-0 z-40 transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center py-4">
-          <div className="flex items-center space-x-4">
-            <div className="relative">
-              <Shield className="h-10 w-10 text-blue-600 drop-shadow-lg" />
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full animate-pulse" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-green-600 bg-clip-text text-transparent">
-                Aegis Link
-              </h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-                Family Health Management • {currentFamily?.family_name || 'Family'}
-              </p>
-            </div>
-          </div>
+    <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
+      <div className="mx-auto flex h-14 max-w-[1280px] items-center gap-3 px-4 sm:px-6 lg:px-8">
+        <button type="button" onClick={onOpenMobileNav} className="btn btn-ghost btn-icon -ml-2 md:hidden" aria-label="Open navigation">
+          <Menu />
+        </button>
+        <div className="md:hidden">
+          <BrandMark compact />
+        </div>
 
-          <div className="flex items-center space-x-4 md:space-x-6">
-            <div className="flex items-center space-x-2 sm:space-x-3">
-              <button
-                onClick={toggleTheme}
-                aria-label="Toggle dark mode"
-                className="p-2 text-gray-600 dark:text-yellow-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
-                title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+        <nav aria-label="Breadcrumb" className="hidden min-w-0 items-center gap-1.5 text-13 md:flex">
+          {contextLabel && (
+            <>
+              <span className="truncate text-slate-500 dark:text-slate-400">{contextLabel}</span>
+              <span className="text-slate-300 dark:text-slate-600" aria-hidden>/</span>
+            </>
+          )}
+          <span className="truncate font-medium text-slate-900 dark:text-slate-100">{sectionLabel}</span>
+        </nav>
+
+        <div className="ml-auto flex items-center gap-1">
+          {canSwitchMember && (
+            <label className="mr-2 hidden items-center gap-2 sm:flex">
+              <span className="text-xs font-medium text-slate-500">Viewing</span>
+              <select
+                className="select input-sm w-44 text-13"
+                value={selectedMember?.user_id || ''}
+                onChange={(e) => {
+                  const member = currentFamily?.members.find((m) => m.user_id === e.target.value);
+                  if (member) onSelectMember(member);
+                }}
               >
-                {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+                {currentFamily?.members.map((member) => (
+                  <option key={member.user_id} value={member.user_id}>
+                    {member.name}
+                    {member.relationship ? ` (${member.relationship})` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {!isDoctor && (
+            <HeaderIconButton label="Symptom checker" onClick={onOpenSymptomChecker}>
+              <Stethoscope />
+            </HeaderIconButton>
+          )}
+          {isPersonal && (
+            <>
+              <HeaderIconButton label="Book telemedicine visit" onClick={onOpenTelemedicine}>
+                <Video />
+              </HeaderIconButton>
+              <HeaderIconButton label="Telepharmacy" onClick={onOpenTelepharmacy}>
+                <ShoppingBag />
+              </HeaderIconButton>
+              <button
+                type="button"
+                onClick={onOpenPointsStore}
+                className="btn btn-secondary btn-sm ml-1 hidden sm:inline-flex"
+                title="Wellness points store"
+              >
+                <Gift className="text-amber-600" />
+                <span className="tabular-nums">{currentUser?.points || 0}</span>
+                <span className="text-slate-500">pts</span>
               </button>
-
-              {!isDoctor && (
-                <button
-                  onClick={onOpenSymptomChecker}
-                  className="p-2 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                  title="AI Symptom Checker"
-                >
-                  <Activity className="h-5 w-5" />
-                </button>
-              )}
-              {!isDoctor && !isCaregiver && (
-                <>
-                  <button
-                    onClick={onOpenTelemedicine}
-                    className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                    title="Telemedicine"
-                  >
-                    <Video className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={onOpenTelepharmacy}
-                    className="p-2 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
-                    title="Telepharmacy"
-                  >
-                    <ShoppingCart className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={onOpenPointsStore}
-                    className="flex items-center space-x-2 bg-gradient-to-r from-yellow-400 to-orange-400 text-white px-3 py-2 rounded-lg hover:from-yellow-500 hover:to-orange-500 transition-all duration-300"
-                    title="Points Store"
-                  >
-                    <Gift className="h-4 w-4" />
-                    <span className="font-bold">{currentUser?.points || 0}</span>
-                  </button>
-                </>
-              )}
-            </div>
-
-            <div className="hidden sm:block text-right">
-              <p className="text-sm font-bold text-gray-800 dark:text-gray-200">Welcome, {currentUser?.name}</p>
-              <p className="text-xs text-gray-600 dark:text-gray-400 font-medium capitalize">
-                {currentUser?.role.replace('_', ' ')} • {selectedMember?.name}
-              </p>
-            </div>
-            <button
-              onClick={onLogout}
-              className="text-sm text-red-600 hover:text-red-700 dark:text-red-400 font-medium hover:underline transition-colors"
-            >
-              Logout
-            </button>
-          </div>
+            </>
+          )}
+          <span className="mx-1 hidden h-5 w-px bg-slate-200 dark:bg-slate-700 sm:block" aria-hidden />
+          <HeaderIconButton label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`} onClick={toggleTheme}>
+            {theme === 'light' ? <Moon /> : <Sun />}
+          </HeaderIconButton>
         </div>
       </div>
+
+      {canSwitchMember && (
+        <div className="border-t border-slate-100 px-4 py-2 dark:border-slate-800 sm:hidden">
+          <label className="flex items-center gap-2">
+            <span className="text-xs font-medium text-slate-500">Viewing</span>
+            <select
+              className="select input-sm flex-1 text-13"
+              value={selectedMember?.user_id || ''}
+              onChange={(e) => {
+                const member = currentFamily?.members.find((m) => m.user_id === e.target.value);
+                if (member) onSelectMember(member);
+              }}
+            >
+              {currentFamily?.members.map((member) => (
+                <option key={member.user_id} value={member.user_id}>
+                  {member.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
     </header>
   );
 };
 
 export default AppHeader;
-

@@ -1,18 +1,8 @@
 @echo off
-title Aegis Link Platform Launcher
-echo ===================================================
-echo  Aegis Link Healthcare Coordination Platform
-echo ===================================================
-echo.
-echo Launching FastAPI Backend on http://localhost:8000 ...
-start "Aegis Link Backend (FastAPI)" cmd /c "%~dp0launch_backend.bat"
-
-echo Launching React Frontend on http://localhost:3000 ...
-start "Aegis Link Frontend (React)" cmd /c "%~dp0launch_frontend.bat"
-
-echo.
-echo Both servers are starting up!
-echo   - Backend API Docs: http://localhost:8000/api/docs
-echo   - Frontend Web App: http://localhost:3000
-echo.
+title Aegis Link Launcher
+cd /d "%~dp0"
+rem Runs both servers via launcher.py: checks ports and dependencies, waits until
+rem the app responds, opens the browser, and stops everything cleanly on Ctrl+C.
+rem Extra options are passed through, e.g.  launch.bat --no-browser
+python launcher.py %*
 pause

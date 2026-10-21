@@ -1,23 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  Activity,
-  AlertTriangle,
-  Bot,
-  Check,
-  ChevronDown,
-  Copy,
-  Maximize2,
-  Minimize2,
-  Pill,
-  Send,
-  Sparkles,
-  Trash2,
-  User as UserIcon,
-  X
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Activity, AlertTriangle, Check, Copy, Maximize2, MessageSquare, Minimize2, Pill, SendHorizontal, Sparkles, Trash2, X } from 'lucide-react';
 import { Family, Medication, User, Vital, Appointment } from '../../types';
 import { apiClient } from '../../services/apiClient';
+import { vitalLabel } from '../../constants/vitals';
 
 interface ChatbotProps {
   currentUser: User | null;
@@ -36,7 +21,46 @@ interface ChatMessage {
   content: string;
   timestamp: string;
   isEmergency?: boolean;
+  /** Where an assistant reply came from: the server AI model or the built-in offline rules. */
+  source?: 'ai' | 'fallback' | 'system';
 }
+
+/** Minimal formatter for the assistant's markdown-style replies (### headings, • bullets, **bold**). */
+const renderInline = (text: string) =>
+  text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.startsWith('**') && part.endsWith('**') ? (
+      <strong key={i} className="font-semibold">
+        {part.slice(2, -2)}
+      </strong>
+    ) : (
+      <React.Fragment key={i}>{part}</React.Fragment>
+    )
+  );
+
+const FormattedReply: React.FC<{ content: string }> = ({ content }) => (
+  <div className="space-y-1.5">
+    {content.split('\n').map((line, i) => {
+      const trimmed = line.trim();
+      if (!trimmed) return null;
+      if (trimmed.startsWith('### ')) {
+        return (
+          <p key={i} className="pt-1 text-13 font-semibold">
+            {renderInline(trimmed.slice(4))}
+          </p>
+        );
+      }
+      if (trimmed.startsWith('• ') || trimmed.startsWith('- ')) {
+        return (
+          <p key={i} className="flex gap-2 pl-1">
+            <span aria-hidden className="text-slate-400">•</span>
+            <span>{renderInline(trimmed.slice(2))}</span>
+          </p>
+        );
+      }
+      return <p key={i}>{renderInline(trimmed)}</p>;
+    })}
+  </div>
+);
 
 export const Chatbot: React.FC<ChatbotProps> = ({
   currentUser,
@@ -56,7 +80,8 @@ export const Chatbot: React.FC<ChatbotProps> = ({
   const initialGreeting: ChatMessage = {
     id: 'welcome',
     role: 'assistant',
-    content: `Hello ${activePerson?.name || 'there'}! 👋 I am your **Aegis AI Health Assistant**.\n\nI have loaded your health records (active medications: **${activeMemberMeds.length}**, recent vitals: **${activeMemberVitals.length}**). I can analyze trends, explain prescriptions, provide evidence-based dietary recommendations, or guide you through clinical care plans.\n\nHow can I help you today?`,
+    source: 'system',
+    content: `Hello ${activePerson?.name || 'there'}. I'm the **Aegis health assistant**.\n\nI can see ${activeMemberMeds.length} active medications and ${activeMemberVitals.length} recent vital-sign readings for ${activePerson?.name || 'you'}. Ask me about trends, prescriptions, diet, or care plans.\n\nMy answers are informational and are not a diagnosis.`,
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   };
 
@@ -72,12 +97,12 @@ export const Chatbot: React.FC<ChatbotProps> = ({
   }, [messages, loading]);
 
   const quickPrompts = [
-    { label: '🩺 Analyze Recent Vitals', prompt: 'Can you analyze my recent blood pressure and vitals trends and let me know if everything looks safe?' },
-    { label: '💊 Check My Medications', prompt: 'Please review my active medication regimen and summarize dosages and adherence precautions.' },
-    { label: '🥗 Nutrition & Diet Plan', prompt: 'What dietary and nutritional guidelines should I follow based on my current health profile?' },
-    { label: '🚨 Emergency Triage Help', prompt: 'What are the red flag symptoms for cardiovascular and metabolic emergencies?' },
+    { label: 'Analyze recent vitals', prompt: 'Can you analyze my recent blood pressure and vitals trends and let me know if everything looks safe?' },
+    { label: 'Review my medications', prompt: 'Please review my active medication regimen and summarize dosages and adherence precautions.' },
+    { label: 'Diet & nutrition', prompt: 'What dietary and nutritional guidelines should I follow based on my current health profile?' },
+    { label: 'Emergency warning signs', prompt: 'What are the red flag symptoms for cardiovascular and metabolic emergencies?' },
     ...(activePerson?.gender === 'female'
-      ? [{ label: '🌸 Reproductive Health Tracking', prompt: 'Explain how my menstrual and reproductive data is kept strictly confidential in Aegis Link.' }]
+      ? [{ label: 'Cycle data privacy', prompt: 'Explain how my menstrual and reproductive data is kept confidential in Aegis Link.' }]
       : [])
   ];
 
@@ -122,24 +147,28 @@ export const Chatbot: React.FC<ChatbotProps> = ({
     }
 
     if (q.includes('vital') || q.includes('bp') || q.includes('pressure') || q.includes('heart') || q.includes('glucose')) {
-      const readings = activeMemberVitals.map((v) => `• **${v.type.toUpperCase()}**: ${v.value} ${v.unit} (${new Date(v.recorded_at).toLocaleDateString()})`).join('\n');
-      return `### 🩺 Vitals Clinical Summary for ${name}\n\n${readings || 'No recent vitals logged yet.'}\n\n**Guidelines:**\n• Systolic BP < 120 mmHg & Diastolic < 80 mmHg are considered ideal.\n• A systolic reading consistently above 130 mmHg warrants dietary sodium reduction and clinical consultation.\n• Keep logging your vitals regularly at consistent times of day!`;
+      const readings = activeMemberVitals
+        .map((v) => `• **${vitalLabel(v.type)}**: ${v.value} ${v.unit} (${new Date(v.recorded_at).toLocaleDateString()})`)
+        .join('\n');
+      return `### Vitals summary for ${name}\n\n${readings || 'No recent vitals logged yet.'}\n\n**General guidance:**\n• Systolic BP < 120 mmHg & Diastolic < 80 mmHg are considered ideal.\n• A systolic reading consistently above 130 mmHg warrants dietary sodium reduction and clinical consultation.\n• Keep logging your vitals regularly at consistent times of day.`;
     }
 
     if (q.includes('medication') || q.includes('pill') || q.includes('dose') || q.includes('drug') || q.includes('aspirin')) {
-      const medList = activeMemberMeds.map((m) => `• **${m.name}** — ${m.dosage} (${m.frequency}) ${m.taken_today ? '✅ Taken today' : '⏳ Due'}`).join('\n');
-      return `### 💊 Current Medication Overview for ${name}\n\n${medList || 'No medications registered in active schedule.'}\n\n**Safety Reminders:**\n• Take prescribed medications with a full glass of water.\n• Do not alter dosage without consulting your assigned doctor or caretaker.\n• Both Caretakers and Doctors can adjust dosages in the portal, creating immutable audit trail records.`;
+      const medList = activeMemberMeds
+        .map((m) => `• **${m.name}** — ${m.dosage} (${m.frequency.replace(/_/g, ' ')}) ${m.taken_today ? '· taken today' : '· due'}`)
+        .join('\n');
+      return `### Current medications for ${name}\n\n${medList || 'No medications registered in active schedule.'}\n\n**Safety reminders:**\n• Take prescribed medications with a full glass of water.\n• Do not alter dosage without consulting your assigned doctor or caregiver.\n• Caregivers and physicians can adjust dosages in the portal.`;
     }
 
     if (q.includes('diet') || q.includes('nutrition') || q.includes('food')) {
-      return `### 🥗 Clinical Dietary Recommendations for ${name}\n\n• **Sodium Control**: Restrict daily sodium to under 2,000 mg to assist blood pressure management.\n• **DASH Protocol**: Incorporate more leafy greens, berries, whole oats, and lean proteins.\n• **Hydration**: Aim for 2.0 to 2.5 liters of clean water daily unless restricted by renal/cardiac guidelines.`;
+      return `### Dietary suggestions for ${name}\n\n• **Sodium control**: Restrict daily sodium to under 2,000 mg to assist blood pressure management.\n• **DASH protocol**: Incorporate more leafy greens, berries, whole oats, and lean proteins.\n• **Hydration**: Aim for 2.0 to 2.5 liters of clean water daily unless restricted by renal/cardiac guidelines.`;
     }
 
     if (q.includes('menstrual') || q.includes('cycle') || q.includes('reproductive')) {
-      return `### 🌸 Privacy & Menstrual Tracking Guarantee\n\nIn compliance with patient confidentiality standards, your reproductive health tracking module is **strictly private**. It is never visible to family members or caretakers, and even authorized physicians require explicit consent to access historical cycle logs.`;
+      return `### Cycle tracking privacy\n\nCycle logs are treated as sensitive data. They are hidden from caregivers in the app, and other people can only access them through the server if you grant them **Cycle tracking** consent in Consent & access.`;
     }
 
-    return `I received your inquiry regarding "${userQuery}". Based on ${name}'s current health records (${activeMemberMeds.length} active medications, ${activeMemberVitals.length} vitals recorded), your profile is actively monitored. Please feel free to ask about vitals analysis, medication side effects, appointment prep, or dietary guidelines!`;
+    return `I received your question about "${userQuery}". Based on ${name}'s current records (${activeMemberMeds.length} active medications, ${activeMemberVitals.length} vitals recorded), I can help with vitals trends, medication questions, appointment preparation, or dietary guidance.`;
   };
 
   const handleSendMessage = async (customPrompt?: string) => {
@@ -177,7 +206,8 @@ export const Chatbot: React.FC<ChatbotProps> = ({
         role: 'assistant',
         content: replyContent,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isEmergency
+        isEmergency,
+        source: data.reply ? 'ai' : 'fallback'
       };
       setMessages((prev) => [...prev, botMsg]);
     } catch (err) {
@@ -188,7 +218,8 @@ export const Chatbot: React.FC<ChatbotProps> = ({
         role: 'assistant',
         content: fallbackReply,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isEmergency: fallbackReply.includes('🚨')
+        isEmergency: fallbackReply.includes('🚨'),
+        source: 'fallback'
       };
       setMessages((prev) => [...prev, botMsg]);
     } finally {
@@ -200,207 +231,179 @@ export const Chatbot: React.FC<ChatbotProps> = ({
     setMessages([initialGreeting]);
   };
 
+  const SOURCE_LABEL: Record<NonNullable<ChatMessage['source']>, string> = {
+    ai: 'AI-generated · not clinician-reviewed',
+    fallback: 'Automated summary (offline) · not clinician-reviewed',
+    system: 'Assistant'
+  };
+
   return (
-    <div className="fixed bottom-5 right-5 z-50">
-      <AnimatePresence>
-        {showChatbot && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.85, y: 30 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.85, y: 30 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className={`bg-white/95 dark:bg-gray-900/95 backdrop-blur-2xl border border-blue-200/60 dark:border-gray-700/60 rounded-3xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 ${
-              isExpanded
-                ? 'w-[92vw] sm:w-[680px] h-[85vh] max-h-[850px]'
-                : 'w-[92vw] sm:w-[440px] h-[580px]'
-            }`}
-          >
-            {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600 p-4 text-white flex items-center justify-between shadow-md">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 shadow-inner">
-                  <Bot className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <h3 className="font-bold text-base leading-tight tracking-wide">Aegis AI Assistant</h3>
-                    <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-400/30 text-emerald-100 rounded-full border border-emerald-300/40">
-                      Live
-                    </span>
-                  </div>
-                  <p className="text-xs text-blue-100 flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-amber-300" />
-                    Focus: <span className="font-semibold underline">{activePerson?.name}</span> ({currentUser?.role})
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-1">
-                <button
-                  onClick={handleClearChat}
-                  title="Clear conversation"
-                  className="p-2 hover:bg-white/15 rounded-xl transition text-white/80 hover:text-white"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setIsExpanded(!isExpanded)}
-                  title={isExpanded ? 'Restore window size' : 'Expand window'}
-                  className="p-2 hover:bg-white/15 rounded-xl transition text-white/80 hover:text-white"
-                >
-                  {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                </button>
-                <button
-                  onClick={() => setShowChatbot(false)}
-                  title="Close assistant"
-                  className="p-2 hover:bg-white/15 rounded-xl transition text-white/80 hover:text-white"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Context Summary Strip */}
-            <div className="bg-gradient-to-r from-blue-50/80 via-emerald-50/80 to-indigo-50/80 dark:from-gray-800/80 dark:via-gray-800/60 dark:to-gray-800/80 px-4 py-2 border-b border-blue-100 dark:border-gray-800 text-xs text-gray-600 dark:text-gray-300 flex items-center justify-between">
-              <span className="flex items-center gap-1.5 truncate">
-                <Activity className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                <span>Vitals: <b>{activeMemberVitals.length} records</b></span>
-                <span className="text-gray-400">•</span>
-                <Pill className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-                <span>Meds: <b>{activeMemberMeds.length} active</b></span>
-              </span>
-              <span className="text-[10px] text-gray-500 font-mono bg-white dark:bg-gray-700 px-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-600">
-                HIPAA / Consent Guarded
-              </span>
-            </div>
-
-            {/* Messages Area */}
-            <div className="flex-1 p-4 overflow-y-auto space-y-4 text-sm scroll-smooth">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
-                >
-                  <div className="flex items-start gap-2 max-w-[88%]">
-                    {msg.role === 'assistant' && (
-                      <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white flex-shrink-0 mt-0.5 shadow-sm">
-                        <Bot className="w-4 h-4" />
-                      </div>
-                    )}
-
-                    <div
-                      className={`relative group p-3.5 rounded-2xl shadow-sm ${
-                        msg.role === 'user'
-                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-tr-none'
-                          : msg.isEmergency
-                          ? 'bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-800 text-red-900 dark:text-red-200 rounded-tl-none'
-                          : 'bg-white dark:bg-gray-800/90 border border-gray-100 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-tl-none'
-                      }`}
-                    >
-                      <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap leading-relaxed">
-                        {msg.content}
-                      </div>
-
-                      {/* Message Actions */}
-                      <div className="mt-1 flex items-center justify-between text-[10px] opacity-70 group-hover:opacity-100 transition pt-1 gap-4">
-                        <span>{msg.timestamp}</span>
-                        {msg.role === 'assistant' && (
-                          <button
-                            onClick={() => handleCopy(msg.id, msg.content)}
-                            className="flex items-center gap-1 hover:text-blue-500 transition"
-                            title="Copy reply"
-                          >
-                            {copiedId === msg.id ? (
-                              <>
-                                <Check className="w-3 h-3 text-emerald-500" />
-                                <span className="text-emerald-500 font-semibold">Copied</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-3 h-3" />
-                                <span>Copy</span>
-                              </>
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {msg.role === 'user' && (
-                      <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-white flex-shrink-0 mt-0.5 shadow-sm">
-                        <UserIcon className="w-4 h-4" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-
-              {loading && (
-                <div className="flex items-center gap-2 text-gray-500 text-xs italic pl-9">
-                  <div className="w-2 h-2 rounded-full bg-blue-500 animate-bounce" />
-                  <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce [animation-delay:0.2s]" />
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-bounce [animation-delay:0.4s]" />
-                  <span>Aegis Assistant is synthesizing medical guidance…</span>
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
-
-            {/* Quick Action Chips */}
-            <div className="px-3 py-2 bg-gray-50/90 dark:bg-gray-800/60 border-t border-gray-100 dark:border-gray-800 overflow-x-auto flex gap-1.5 scrollbar-none">
-              {quickPrompts.map((qp, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleSendMessage(qp.prompt)}
-                  disabled={loading}
-                  className="px-2.5 py-1 rounded-xl text-xs font-medium bg-white dark:bg-gray-700/80 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 transition shadow-xs whitespace-nowrap flex-shrink-0 active:scale-95 disabled:opacity-50"
-                >
-                  {qp.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Input Bar */}
-            <div className="p-3 bg-white dark:bg-gray-900 border-t border-gray-200/80 dark:border-gray-800">
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
-                  placeholder={`Ask anything about ${activePerson?.name}'s health, vitals, meds...`}
-                  disabled={loading}
-                  className="flex-1 px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition"
-                />
-                <button
-                  onClick={() => handleSendMessage()}
-                  disabled={!input.trim() || loading}
-                  className="bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white p-3 rounded-2xl disabled:opacity-40 transition-all shadow-md hover:shadow-lg active:scale-95 flex items-center justify-center flex-shrink-0"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
-              </div>
-              <p className="text-[10px] text-gray-400 dark:text-gray-500 text-center mt-1.5">
-                AI health companion. In critical situations, contact emergency services directly.
+    <div className="fixed bottom-20 right-4 z-40 flex flex-col items-end gap-3 md:bottom-5 md:right-5">
+      {showChatbot && (
+        <section
+          aria-label="Aegis health assistant"
+          className={`flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-pop dark:border-slate-800 dark:bg-slate-900 ${
+            isExpanded
+              ? 'h-[min(85vh,850px)] w-[calc(100vw-2rem)] sm:w-[680px]'
+              : 'h-[min(36rem,calc(100vh-9rem))] w-[calc(100vw-2rem)] sm:w-[420px]'
+          }`}
+        >
+          {/* Header */}
+          <header className="flex items-start gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+            <span className="icon-tile h-8 w-8 bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
+              <Sparkles aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Aegis health assistant</h2>
+              <p className="truncate text-2xs text-slate-500">
+                About <span className="font-medium text-slate-700 dark:text-slate-300">{activePerson?.name}</span> · informational, not medical advice
               </p>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <div className="-mr-1 flex items-center">
+              <button type="button" onClick={handleClearChat} className="btn btn-ghost btn-icon btn-sm" aria-label="Clear conversation" title="Clear conversation">
+                <Trash2 />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="btn btn-ghost btn-icon btn-sm hidden sm:inline-flex"
+                aria-label={isExpanded ? 'Restore size' : 'Expand'}
+                title={isExpanded ? 'Restore size' : 'Expand'}
+              >
+                {isExpanded ? <Minimize2 /> : <Maximize2 />}
+              </button>
+              <button type="button" onClick={() => setShowChatbot(false)} className="btn btn-ghost btn-icon btn-sm" aria-label="Close assistant">
+                <X />
+              </button>
+            </div>
+          </header>
 
-      {/* Floating Launcher Button */}
-      <motion.button
+          {/* Context strip */}
+          <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-2 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+              <Activity className="h-3.5 w-3.5 text-slate-400" aria-hidden />
+              <span className="tabular-nums">{activeMemberVitals.length}</span> recent vitals
+            </span>
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+              <Pill className="h-3.5 w-3.5 text-slate-400" aria-hidden />
+              <span className="tabular-nums">{activeMemberMeds.length}</span> medications
+            </span>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50/40 px-4 py-4 dark:bg-slate-950/30" aria-live="polite">
+            {messages.map((msg) =>
+              msg.role === 'user' ? (
+                <div key={msg.id} className="flex flex-col items-end">
+                  <p className="max-w-[85%] whitespace-pre-wrap rounded-xl rounded-br-sm bg-brand-700 px-3 py-2 text-13 leading-5 text-white">{msg.content}</p>
+                  <span className="mt-1 text-2xs tabular-nums text-slate-400">You · {msg.timestamp}</span>
+                </div>
+              ) : (
+                <div key={msg.id} className="group max-w-[92%]">
+                  <p
+                    className={`mb-1 flex items-center gap-1 text-2xs font-medium ${
+                      msg.isEmergency ? 'text-red-700 dark:text-red-400' : 'text-violet-700 dark:text-violet-300'
+                    }`}
+                  >
+                    {msg.isEmergency ? <AlertTriangle className="h-3 w-3" aria-hidden /> : <Sparkles className="h-3 w-3" aria-hidden />}
+                    {msg.isEmergency ? 'Urgent safety guidance' : SOURCE_LABEL[msg.source || 'system']}
+                  </p>
+                  <div
+                    className={`rounded-xl rounded-tl-sm border px-3 py-2.5 text-13 leading-5 ${
+                      msg.isEmergency
+                        ? 'border-red-200 bg-red-50 text-red-900 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200'
+                        : 'border-slate-200 bg-white text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200'
+                    }`}
+                  >
+                    <FormattedReply content={msg.content} />
+                  </div>
+                  <div className="mt-1 flex items-center gap-3 text-2xs text-slate-400">
+                    <span className="tabular-nums">{msg.timestamp}</span>
+                    {msg.source !== 'system' && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(msg.id, msg.content)}
+                        className="inline-flex items-center gap-1 opacity-0 transition-opacity hover:text-slate-600 focus-visible:opacity-100 group-hover:opacity-100"
+                        aria-label="Copy reply"
+                      >
+                        {copiedId === msg.id ? (
+                          <>
+                            <Check className="h-3 w-3 text-emerald-600" aria-hidden /> Copied
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3 w-3" aria-hidden /> Copy
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            )}
+
+            {loading && (
+              <div className="flex items-center gap-1 pl-1" aria-label="Assistant is responding">
+                {[0, 1, 2].map((i) => (
+                  <span key={i} className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: `${i * 120}ms` }} />
+                ))}
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Quick prompts */}
+          <div className="no-scrollbar flex gap-1.5 overflow-x-auto border-t border-slate-100 px-3 py-2 dark:border-slate-800">
+            {quickPrompts.map((qp) => (
+              <button
+                key={qp.label}
+                type="button"
+                onClick={() => handleSendMessage(qp.prompt)}
+                disabled={loading}
+                className="h-7 shrink-0 whitespace-nowrap rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 transition-colors hover:border-brand-400 hover:text-brand-800 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+              >
+                {qp.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Input */}
+          <form
+            className="border-t border-slate-100 p-3 dark:border-slate-800"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSendMessage();
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={`Ask about ${activePerson?.name || 'your'} vitals, medications…`}
+                aria-label="Message the assistant"
+                disabled={loading}
+                className="input input-sm flex-1"
+              />
+              <button type="submit" disabled={!input.trim() || loading} className="btn btn-primary btn-icon btn-sm h-9 w-9" aria-label="Send message">
+                <SendHorizontal />
+              </button>
+            </div>
+            <p className="mt-1.5 text-center text-2xs text-slate-400">In an emergency, contact emergency services directly.</p>
+          </form>
+        </section>
+      )}
+
+      <button
+        type="button"
         onClick={() => setShowChatbot(!showChatbot)}
-        whileHover={{ scale: 1.08 }}
-        whileTap={{ scale: 0.95 }}
-        className="relative group bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600 text-white p-4 rounded-3xl shadow-2xl flex items-center justify-center border-2 border-white/40"
+        className="btn h-11 rounded-full border border-slate-200 bg-white px-4 text-slate-800 shadow-pop hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+        aria-expanded={showChatbot}
+        aria-label={showChatbot ? 'Close assistant' : 'Open assistant'}
       >
-        <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-          <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500" />
-        </span>
-        <Bot className="h-7 w-7 text-white" />
-      </motion.button>
+        {showChatbot ? <X /> : <MessageSquare className="text-brand-700 dark:text-brand-400" />}
+        <span className="hidden sm:inline">{showChatbot ? 'Close' : 'Assistant'}</span>
+      </button>
     </div>
   );
 };

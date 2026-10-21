@@ -1,108 +1,92 @@
-import React, { useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Shield, Sparkles } from 'lucide-react';
+import React from 'react';
+import { ArrowRight, BellRing, FolderLock, HeartHandshake, History, ShieldCheck, Stethoscope, User, Users } from 'lucide-react';
+import { BrandMark } from '../../components/layout/AppSidebar';
 
 interface LandingPageProps {
   onGetStarted: () => void;
 }
 
+const ROLES = [
+  { icon: User, title: 'Patients', text: 'Vital signs, prescriptions, appointments and who can see your record.' },
+  { icon: Stethoscope, title: 'Physicians', text: 'Trends, flagged readings, prescriptions and treatment plans in one view.' },
+  { icon: HeartHandshake, title: 'Professional caregivers', text: 'Assigned patients, care tasks, observations and escalations.' },
+  { icon: Users, title: 'Family', text: 'Shared updates and care activity — limited to what the patient allows.' }
+];
+
+const PILLARS = [
+  { icon: BellRing, title: 'Real-time alerts', text: 'Readings outside alert limits notify the care team as they arrive.' },
+  { icon: ShieldCheck, title: 'Consent-gated access', text: 'Patients grant and revoke access by category, with optional expiry.' },
+  { icon: FolderLock, title: 'Encrypted medical vault', text: 'Documents are encrypted on the server with AES-256-GCM.' },
+  { icon: History, title: 'Activity log', text: 'Consent changes and document access are recorded for review.' }
+];
+
 const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
-  useEffect(() => {
-    const canvas = document.getElementById('aegis-particles') as HTMLCanvasElement | null;
-    if (!canvas) return;
-    const context = canvas.getContext('2d');
-    if (!context) return;
-    let animationId = 0;
-    const particles = Array.from({ length: 28 }).map(() => ({
-      x: Math.random() * window.innerWidth,
-      y: Math.random() * window.innerHeight,
-      vx: (Math.random() - 0.5) * 0.6,
-      vy: (Math.random() - 0.5) * 0.6,
-      r: 1.5 + Math.random() * 2
-    }));
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-    resize();
-    window.addEventListener('resize', resize);
-
-    const loop = () => {
-      if (document.hidden) {
-        animationId = requestAnimationFrame(loop);
-        return;
-      }
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      context.fillStyle = 'rgba(37,99,235,0.7)';
-      particles.forEach(particle => {
-        particle.x += particle.vx;
-        particle.y += particle.vy;
-        if (particle.x < 0 || particle.x > canvas.width) particle.vx *= -1;
-        if (particle.y < 0 || particle.y > canvas.height) particle.vy *= -1;
-        context.beginPath();
-        context.arc(particle.x, particle.y, particle.r, 0, Math.PI * 2);
-        context.fill();
-        context.beginPath();
-        context.arc(particle.x - particle.vx * 6, particle.y - particle.vy * 6, Math.max(0.5, particle.r - 1), 0, Math.PI * 2);
-        context.fillStyle = 'rgba(16,185,129,0.35)';
-        context.fill();
-      });
-      context.strokeStyle = 'rgba(99,102,241,0.12)';
-      particles.forEach((particle, index) => {
-        for (let nextIndex = index + 1; nextIndex < particles.length; nextIndex++) {
-          const other = particles[nextIndex];
-          const dx = particle.x - other.x;
-          const dy = particle.y - other.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          if (distance < 100) {
-            context.globalAlpha = (100 - distance) / 200;
-            context.beginPath();
-            context.moveTo(particle.x, particle.y);
-            context.lineTo(other.x, other.y);
-            context.stroke();
-            context.globalAlpha = 1;
-          }
-        }
-      });
-      animationId = requestAnimationFrame(loop);
-    };
-
-    animationId = requestAnimationFrame(loop);
-    return () => {
-      cancelAnimationFrame(animationId);
-      window.removeEventListener('resize', resize);
-    };
-  }, []);
-
   return (
-    <div className="min-h-screen relative overflow-hidden">
-      <canvas id="aegis-particles" className="fixed inset-0 will-change-transform" />
-      <div className="absolute inset-0" style={{
-        background: 'radial-gradient(1000px 400px at 20% 10%, rgba(59,130,246,0.15), transparent), radial-gradient(800px 300px at 80% 20%, rgba(16,185,129,0.15), transparent)'
-      }} />
-      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen text-center p-6">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="mb-6">
-          <div className="inline-flex items-center justify-center h-20 w-20 rounded-3xl bg-white/20 backdrop-blur-xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-white/30">
-            <Shield className="h-10 w-10 text-blue-600" />
-          </div>
-        </motion.div>
-        <motion.h1 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.6 }} className="text-4xl md:text-6xl font-extrabold tracking-tight bg-gradient-to-r from-blue-600 via-cyan-500 to-green-600 bg-clip-text text-transparent">
-          Aegis Link
-        </motion.h1>
-        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25, duration: 0.6 }} className="mt-4 max-w-2xl text-base md:text-lg text-gray-700">
-          Smart, beautiful healthcare for Patients, Caregivers, and Doctors.
-        </motion.p>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4, duration: 0.5 }} className="mt-10 flex items-center gap-4">
-          <button onClick={onGetStarted} className="group relative px-8 py-3 rounded-2xl text-white font-semibold">
-            <span className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-500 to-green-600 animate-gradient-x" />
-            <span className="absolute -inset-[2px] rounded-2xl bg-gradient-to-r from-blue-400/60 via-indigo-300/60 to-green-400/60 blur opacity-70 group-hover:opacity-90 transition" />
-            <span className="relative z-10 flex items-center gap-2">
-              Get Started
-              <Sparkles className="w-4 h-4 opacity-90 group-hover:animate-ping" />
-            </span>
+    <div className="min-h-screen bg-canvas dark:bg-slate-950">
+      <header className="border-b border-slate-100 dark:border-slate-800">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+          <BrandMark />
+          <button type="button" onClick={onGetStarted} className="btn btn-secondary btn-sm">
+            Sign in
           </button>
-        </motion.div>
-      </div>
+        </div>
+      </header>
+
+      <main>
+        <section className="mx-auto max-w-6xl px-4 pb-16 pt-16 sm:px-6 sm:pt-24">
+          <div className="max-w-3xl">
+            <p className="badge badge-brand mb-5">Care coordination platform</p>
+            <h1 className="text-4xl font-semibold leading-[1.1] tracking-tight text-slate-900 dark:text-slate-50 sm:text-5xl">
+              Everyone caring for a patient, working from the same record.
+            </h1>
+            <p className="mt-5 max-w-2xl text-lg leading-relaxed text-slate-600 dark:text-slate-400">
+              Aegis Link connects patients, physicians, professional caregivers and family around live vital signs, prescriptions
+              and care activity — with access the patient controls.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <button type="button" onClick={onGetStarted} className="btn btn-primary btn-lg px-5">
+                Get started
+                <ArrowRight />
+              </button>
+              <button type="button" onClick={onGetStarted} className="btn btn-secondary btn-lg px-5">
+                Sign in
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-16 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {ROLES.map((r) => (
+              <div key={r.title} className="card p-5">
+                <span className="icon-tile bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300">
+                  <r.icon aria-hidden />
+                </span>
+                <h2 className="mt-4 text-sm font-semibold text-slate-900 dark:text-slate-100">{r.title}</h2>
+                <p className="mt-1 text-13 leading-5 text-slate-500 dark:text-slate-400">{r.text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="border-t border-slate-200/70 bg-white dark:border-slate-800 dark:bg-slate-900/40">
+          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-4 py-14 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
+            {PILLARS.map((p) => (
+              <div key={p.title} className="flex gap-3">
+                <p.icon className="mt-0.5 h-5 w-5 shrink-0 text-brand-700 dark:text-brand-400" aria-hidden />
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{p.title}</h3>
+                  <p className="mt-1 text-13 leading-5 text-slate-500 dark:text-slate-400">{p.text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </main>
+
+      <footer className="border-t border-slate-100 dark:border-slate-800">
+        <div className="mx-auto max-w-6xl px-4 py-6 text-xs text-slate-500 sm:px-6">
+          Aegis Link supports care coordination and does not replace emergency services or professional medical judgement.
+        </div>
+      </footer>
     </div>
   );
 };

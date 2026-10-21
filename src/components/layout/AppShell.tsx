@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import { useAuthStore, useHealthDataStore, useUIStore } from '../../store';
 import { useToastStore } from '../../store/toastStore';
 import AppHeader from './AppHeader';
 import AppSidebar from './AppSidebar';
 import LoadingFrame from './LoadingFrame';
-import FamilyMemberSelector from './FamilyMemberSelector';
+import { labelForTab } from './navigation';
 import ToastContainer from '../common/ToastContainer';
 import ConfirmDialog from '../common/ConfirmDialog';
 import DoctorDashboard from '../../pages/DoctorDashboard';
@@ -18,6 +17,10 @@ import AppointmentManager from '../../features/appointments/AppointmentManager';
 import VitalManager from '../../features/vitals/VitalManager';
 import HealthGoalsManager from '../../features/goals/HealthGoalsManager';
 import EmergencyContactsManager from '../../features/emergency/EmergencyContactsManager';
+import InsightsPanel from '../../features/insights/InsightsPanel';
+import MedicalVault from '../../features/vault/MedicalVault';
+import ConsentCenter from '../../features/consent/ConsentCenter';
+import AuditTrail from '../../features/audit/AuditTrail';
 import Chatbot from '../../features/chatbot/Chatbot';
 import TelemedicineModal from '../../features/telemedicine/TelemedicineModal';
 import TelepharmacyModal from '../../features/telepharmacy/TelepharmacyModal';
@@ -31,11 +34,9 @@ export const AppShell: React.FC = () => {
   const { currentUser, currentFamily, selectedMember, setSelectedMember, logout, setCurrentUser } = useAuthStore();
   const {
     medications,
-    setMedications,
     appointments,
     setAppointments,
     vitals,
-    setVitals,
     healthGoals,
     setHealthGoals,
     emergencyContacts,
@@ -70,17 +71,34 @@ export const AppShell: React.FC = () => {
   const { showWarning, secondsRemaining, extendSession } = useIdleTimer();
   const [showSosConfirm, setShowSosConfirm] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Navigation state lives in a global store and would otherwise survive sign-out, landing the
+  // next user (possibly in a different role) on a section their role does not have.
+  useEffect(() => {
+    useUIStore.getState().setActiveTab('dashboard');
+    useUIStore.getState().setShowFamilyView(false);
+  }, [currentUser?.user_id]);
+
+  const isPersonal = currentUser?.role === 'patient' || currentUser?.role === 'family_member';
+  const familyViewActive = showFamilyView && isPersonal;
+  const sectionLabel = familyViewActive ? 'Family overview' : labelForTab(currentUser?.role, activeTab);
 
   const handleSosConfirm = () => {
-    showToast('🚨 Family Emergency SOS activated! All contacts and family notified.', 'error');
+    showToast('Emergency SOS activated. Your family and emergency contacts have been notified.', 'error');
   };
 
   const handleLogoutConfirm = () => {
     logout();
-    showToast('You have been logged out.', 'info');
+    showToast('You have been signed out.', 'info');
   };
 
   const renderContent = () => {
+    // Shared, role-agnostic record screens. Access is enforced server-side.
+    if (activeTab === 'audit') {
+      return <AuditTrail currentUser={currentUser} />;
+    }
+
     if (currentUser?.role === 'doctor') {
       return (
         <DoctorDashboard
@@ -95,7 +113,7 @@ export const AppShell: React.FC = () => {
     }
 
     if (currentUser?.role === 'caregiver') {
-      if (['dashboard', 'tasks', 'patients', 'alerts'].includes(activeTab)) {
+      if (['dashboard', 'tasks', 'patients', 'alerts', 'logs'].includes(activeTab)) {
         return (
           <CaregiverDashboard
             currentFamily={currentFamily}
@@ -129,7 +147,7 @@ export const AppShell: React.FC = () => {
     }
 
     // Patient & Family Member
-    if (showFamilyView && (currentUser?.role === 'patient' || currentUser?.role === 'family_member')) {
+    if (familyViewActive) {
       return (
         <FamilyDashboard
           currentFamily={currentFamily}
@@ -149,85 +167,27 @@ export const AppShell: React.FC = () => {
             selectedMember={selectedMember}
             appointments={appointments}
             setAppointments={setAppointments}
+            onOpenTelemedicine={() => setShowTelemedicine(true)}
           />
         );
       case 'vitals':
         return <VitalManager selectedMember={selectedMember} />;
       case 'insights':
         return (
-          <div className="space-y-6">
-            <div className="relative p-[2px] rounded-3xl overflow-hidden">
-              <div className="absolute -inset-[2px] bg-gradient-to-r from-purple-400 via-pink-300 to-fuchsia-400 opacity-70 blur" />
-              <div className="relative rounded-3xl bg-white/70 dark:bg-gray-800/80 backdrop-blur-xl p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-2xl font-extrabold bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 bg-clip-text text-transparent">
-                      AI Insights
-                    </h3>
-                    <p className="text-gray-600 dark:text-gray-400">Personalized, live health intelligence</p>
-                  </div>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setShowSymptomChecker(true)}
-                      className="relative group rounded-xl px-5 py-3 font-semibold text-white"
-                    >
-                      <span className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600" />
-                      <span className="absolute -inset-[2px] rounded-xl bg-gradient-to-r from-purple-400/60 to-pink-400/60 blur opacity-70 group-hover:opacity-100 transition" />
-                      <span className="relative z-10">Symptom Checker</span>
-                    </button>
-                    <button
-                      onClick={() => setShowPredictiveInsights(true)}
-                      className="relative group rounded-xl px-5 py-3 font-semibold text-white"
-                    >
-                      <span className="absolute inset-0 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600" />
-                      <span className="absolute -inset-[2px] rounded-xl bg-gradient-to-r from-indigo-400/60 to-blue-400/60 blur opacity-70 group-hover:opacity-100 transition" />
-                      <span className="relative z-10">Predictive Insights</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 rounded-2xl bg-white/70 dark:bg-gray-800/70 border border-gray-100 dark:border-gray-700">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Risk Level</p>
-                    <p className="text-xl font-bold text-purple-700 dark:text-purple-400">{aiInsights?.risk_level || 'low'}</p>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-white/70 dark:bg-gray-800/70 border border-gray-100 dark:border-gray-700">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Confidence</p>
-                    <p className="text-xl font-bold text-indigo-700 dark:text-indigo-400">
-                      {aiInsights ? `${Math.round(aiInsights.confidence * 100)}%` : '—'}
-                    </p>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-white/70 dark:bg-gray-800/70 border border-gray-100 dark:border-gray-700 md:col-span-1">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Trend</p>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">{aiInsights?.predicted_trends || 'Stable'}</p>
-                  </div>
-                </div>
-
-                <div className="mt-4 p-4 rounded-2xl bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800/60 border border-purple-200 dark:border-gray-700">
-                  <p className="text-sm text-gray-700 dark:text-gray-300 font-medium">Recommendations</p>
-                  <ul className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2">
-                    {(aiInsights?.recommendations || ['Stay hydrated', 'Daily walk 20 min', 'Sleep 7-8h']).map(
-                      (rec: string, i: number) => (
-                        <li key={i} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                          <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                          <span>{rec}</span>
-                        </li>
-                      )
-                    )}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      case 'goals':
-        return (
-          <HealthGoalsManager
+          <InsightsPanel
+            aiInsights={aiInsights}
             selectedMember={selectedMember}
-            healthGoals={healthGoals}
-            setHealthGoals={setHealthGoals}
+            onOpenSymptomChecker={() => setShowSymptomChecker(true)}
+            onOpenPredictiveInsights={() => setShowPredictiveInsights(true)}
+            onOpenAssistant={() => setShowChatbot(true)}
           />
         );
+      case 'goals':
+        return <HealthGoalsManager selectedMember={selectedMember} healthGoals={healthGoals} setHealthGoals={setHealthGoals} />;
+      case 'vault':
+        return <MedicalVault currentUser={currentUser} />;
+      case 'consent':
+        return <ConsentCenter currentUser={currentUser} currentFamily={currentFamily} />;
       case 'emergency':
         return (
           <EmergencyContactsManager
@@ -256,52 +216,50 @@ export const AppShell: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-yellow-50/30 via-blue-50/20 to-green-50/40 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 text-gray-900 dark:text-gray-100 transition-colors duration-300 pb-20 md:pb-8">
-      <AppHeader
+    <div className="min-h-screen bg-canvas text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[80] focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:text-13 focus:shadow-pop"
+      >
+        Skip to content
+      </a>
+
+      <AppSidebar
         currentUser={currentUser}
         currentFamily={currentFamily}
-        selectedMember={selectedMember}
-        onOpenSymptomChecker={() => setShowSymptomChecker(true)}
-        onOpenTelemedicine={() => setShowTelemedicine(true)}
-        onOpenTelepharmacy={() => setShowTelepharmacy(true)}
-        onOpenPointsStore={() => setShowPointsStore(true)}
+        activeTab={activeTab}
+        showFamilyView={showFamilyView}
+        onNavigate={navigateTo}
+        onToggleFamilyView={() => setShowFamilyView(!showFamilyView)}
         onLogout={() => setShowLogoutConfirm(true)}
+        mobileOpen={mobileNavOpen}
+        onMobileOpenChange={setMobileNavOpen}
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {currentUser?.role !== 'patient' && (
-          <FamilyMemberSelector
-            currentFamily={currentFamily}
-            currentUser={currentUser}
-            selectedMember={selectedMember}
-            onSelectMember={setSelectedMember}
-          />
-        )}
+      <div className="md:pl-sidebar">
+        <AppHeader
+          currentUser={currentUser}
+          currentFamily={currentFamily}
+          selectedMember={selectedMember}
+          sectionLabel={sectionLabel}
+          onSelectMember={setSelectedMember}
+          onOpenSymptomChecker={() => setShowSymptomChecker(true)}
+          onOpenTelemedicine={() => setShowTelemedicine(true)}
+          onOpenTelepharmacy={() => setShowTelepharmacy(true)}
+          onOpenPointsStore={() => setShowPointsStore(true)}
+          onOpenMobileNav={() => setMobileNavOpen(true)}
+        />
 
-        <div className="flex gap-8">
-          <AppSidebar
-            currentUser={currentUser}
-            currentFamily={currentFamily}
-            activeTab={activeTab}
-            showFamilyView={showFamilyView}
-            onNavigate={navigateTo}
-            onToggleFamilyView={() => setShowFamilyView(!showFamilyView)}
-          />
-
-          <main className="flex-1">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab + (showFamilyView ? '-family' : '') + (currentUser?.role || '')}
-                initial={{ opacity: 0, y: 8, scale: 0.997 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -8, scale: 0.997 }}
-                transition={{ duration: 0.22, ease: 'easeOut' }}
-              >
-                {renderContent()}
-              </motion.div>
-            </AnimatePresence>
-          </main>
-        </div>
+        <main id="main-content" className="mx-auto max-w-[1280px] px-4 pb-28 pt-6 sm:px-6 md:pb-12 lg:px-8">
+          <motion.div
+            key={activeTab + (familyViewActive ? '-family' : '') + (currentUser?.role || '')}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+          >
+            {renderContent()}
+          </motion.div>
+        </main>
       </div>
 
       <Chatbot
@@ -326,50 +284,38 @@ export const AppShell: React.FC = () => {
         />
       )}
 
-      {showTelepharmacy && (
-        <TelepharmacyModal onClose={() => setShowTelepharmacy(false)} />
-      )}
+      {showTelepharmacy && <TelepharmacyModal onClose={() => setShowTelepharmacy(false)} />}
 
       {showPointsStore && (
-        <PointsStoreModal
-          onClose={() => setShowPointsStore(false)}
-          currentUser={currentUser}
-          setCurrentUser={setCurrentUser}
-        />
+        <PointsStoreModal onClose={() => setShowPointsStore(false)} currentUser={currentUser} setCurrentUser={setCurrentUser} />
       )}
 
-      {showSymptomChecker && (
-        <AISymptomChecker onClose={() => setShowSymptomChecker(false)} />
-      )}
+      {showSymptomChecker && <AISymptomChecker onClose={() => setShowSymptomChecker(false)} />}
 
-      {showPredictiveInsights && (
-        <PredictiveHealthInsights onClose={() => setShowPredictiveInsights(false)} />
-      )}
+      {showPredictiveInsights && <PredictiveHealthInsights onClose={() => setShowPredictiveInsights(false)} />}
 
       <ConfirmDialog
         isOpen={showSosConfirm}
         onClose={() => setShowSosConfirm(false)}
         onConfirm={handleSosConfirm}
-        title="Activate Emergency SOS?"
-        message="Are you sure you want to activate the family emergency SOS? This will notify all family members and emergency contacts immediately with your location and recent health vitals."
+        title="Activate emergency SOS?"
+        message="This immediately notifies all family members and emergency contacts with your location and most recent vital signs. If this is a medical emergency, also call your local emergency number."
         confirmText="Activate SOS"
         cancelText="Cancel"
-        isDestructive={true}
+        isDestructive
       />
 
       <ConfirmDialog
         isOpen={showLogoutConfirm}
         onClose={() => setShowLogoutConfirm(false)}
         onConfirm={handleLogoutConfirm}
-        title="Sign Out"
-        message="Are you sure you want to sign out of your Aegis Link account?"
-        confirmText="Sign Out"
-        cancelText="Stay Logged In"
+        title="Sign out of Aegis Link?"
+        message="You'll need to sign in again to view health information."
+        confirmText="Sign out"
+        cancelText="Stay signed in"
       />
 
-      {showWarning && (
-        <IdleWarningModal secondsRemaining={secondsRemaining} onExtend={extendSession} />
-      )}
+      {showWarning && <IdleWarningModal secondsRemaining={secondsRemaining} onExtend={extendSession} />}
 
       <ToastContainer />
     </div>
@@ -377,4 +323,3 @@ export const AppShell: React.FC = () => {
 };
 
 export default AppShell;
-

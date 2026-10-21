@@ -1,61 +1,56 @@
 import React from 'react';
-import { User as UserIcon } from 'lucide-react';
+import { ClipboardPlus, Eye } from 'lucide-react';
 import { CaregiverPatient } from '../types';
 import { maskId } from '../../../utils/piiMasker';
+import { Avatar } from '../../../components/ui';
 
 interface PatientCardProps {
   patient: CaregiverPatient;
+  /** Today's medication adherence in percent, or null when nothing is scheduled. */
+  adherence?: number | null;
   onOpenDetails: (patientId: string) => void;
   onCreateTask: (patientName: string) => void;
 }
 
-export const PatientCard: React.FC<PatientCardProps> = ({
-  patient,
-  onOpenDetails,
-  onCreateTask
-}) => (
-  <div className="bg-white/80 backdrop-blur-lg p-6 rounded-2xl shadow-xl border border-white/20 hover:shadow-2xl transition-all duration-300">
-    <div className="flex items-center justify-between mb-4">
-      <div className="flex items-center space-x-3">
-        <div className="h-12 w-12 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-full flex items-center justify-center">
-          <UserIcon className="h-7 w-7 text-white" />
-        </div>
-        <div>
-          <h3 className="font-bold text-gray-800">{patient.name}</h3>
-          <p className="text-xs text-blue-600 font-mono">ID: {maskId(patient.id)}</p>
-          <p className="text-sm text-gray-600">Linked: {new Date(patient.linked_at).toLocaleDateString()}</p>
-        </div>
+export const PatientCard: React.FC<PatientCardProps> = ({ patient, adherence, onOpenDetails, onCreateTask }) => (
+  <div className="card flex flex-col p-4">
+    <div className="flex items-start gap-3">
+      <Avatar name={patient.name} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{patient.name}</p>
+        <p className="font-mono text-xs text-slate-500">ID {maskId(patient.id)}</p>
       </div>
-      <div className="flex space-x-2">
-        <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">Active</span>
-      </div>
+      <span className="badge badge-success">Active</span>
     </div>
-    <div className="grid grid-cols-2 gap-4 text-center mb-4">
-      <div className="bg-emerald-50 p-3 rounded-xl">
-        <p className="text-2xl font-bold text-emerald-600">{patient.medication_count || 0}</p>
-        <p className="text-xs text-gray-600">Medications</p>
+
+    <dl className="mt-4 grid grid-cols-3 divide-x divide-slate-100 rounded-lg border border-slate-100 dark:divide-slate-800 dark:border-slate-800">
+      <div className="px-3 py-2">
+        <dt className="text-2xs font-medium text-slate-500">Medications</dt>
+        <dd className="text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100">{patient.medication_count || 0}</dd>
       </div>
-      <div className="bg-blue-50 p-3 rounded-xl">
-        <p className="text-2xl font-bold text-blue-600">{patient.appointment_count || 0}</p>
-        <p className="text-xs text-gray-600">Appointments</p>
+      <div className="px-3 py-2">
+        <dt className="text-2xs font-medium text-slate-500">Appointments</dt>
+        <dd className="text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100">{patient.appointment_count || 0}</dd>
       </div>
-    </div>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-      <button
-        onClick={() => onOpenDetails(patient.id)}
-        className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 text-white py-2 rounded-xl hover:from-blue-600 hover:to-cyan-600 transition-all duration-300 font-semibold shadow"
-      >
-        View Details
+      <div className="px-3 py-2">
+        <dt className="text-2xs font-medium text-slate-500">Adherence</dt>
+        <dd className="text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+          {adherence === null || adherence === undefined ? '—' : `${adherence}%`}
+        </dd>
+      </div>
+    </dl>
+
+    <div className="mt-4 grid grid-cols-2 gap-2">
+      <button type="button" onClick={() => onOpenDetails(patient.id)} className="btn btn-secondary btn-sm">
+        <Eye />
+        View record
       </button>
-      <button
-        onClick={() => onCreateTask(patient.name)}
-        className="w-full bg-gradient-to-r from-emerald-500 to-green-500 text-white py-2 rounded-xl hover:from-emerald-600 hover:to-green-600 transition-all duration-300 font-semibold shadow"
-      >
-        Create Task
+      <button type="button" onClick={() => onCreateTask(patient.name)} className="btn btn-secondary btn-sm">
+        <ClipboardPlus />
+        Add task
       </button>
     </div>
   </div>
 );
 
 export default PatientCard;
-

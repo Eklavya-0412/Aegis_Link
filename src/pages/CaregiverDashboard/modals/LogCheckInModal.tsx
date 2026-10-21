@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Activity, ClipboardList, Pill, XCircle } from 'lucide-react';
-import { Medication, User } from '../../../types';
+import { AlertCircle, ClipboardList, Loader2 } from 'lucide-react';
+import { Medication } from '../../../types';
 import { createCaregiverCheckin } from '../../../services/clinicalService';
+import Modal from '../../../components/common/Modal';
+import { Field } from '../../../components/ui';
 
 interface LogCheckInModalProps {
   patients: { id: string; name: string }[];
@@ -11,13 +13,14 @@ interface LogCheckInModalProps {
   onCheckinSuccess: (checkin: any) => void;
 }
 
-export const LogCheckInModal: React.FC<LogCheckInModalProps> = ({
-  patients,
-  selectedPatientId,
-  medications,
-  onClose,
-  onCheckinSuccess
-}) => {
+const VISIT_TYPES = [
+  { value: 'routine_check', label: 'Routine check-in' },
+  { value: 'medication_administration', label: 'Medication administration' },
+  { value: 'vital_monitoring', label: 'Vital signs monitoring' },
+  { value: 'emergency_response', label: 'Emergency response' }
+];
+
+export const LogCheckInModal: React.FC<LogCheckInModalProps> = ({ patients, selectedPatientId, medications, onClose, onCheckinSuccess }) => {
   const [patientId, setPatientId] = useState(selectedPatientId || patients[0]?.id || '');
   const [visitType, setVisitType] = useState('routine_check');
   const [notes, setNotes] = useState('');
@@ -31,9 +34,7 @@ export const LogCheckInModal: React.FC<LogCheckInModalProps> = ({
   const patientMeds = medications.filter((m) => m.member_id === patientId);
 
   const toggleMed = (medName: string) => {
-    setSelectedMeds((prev) =>
-      prev.includes(medName) ? prev.filter((m) => m !== medName) : [...prev, medName]
-    );
+    setSelectedMeds((prev) => (prev.includes(medName) ? prev.filter((m) => m !== medName) : [...prev, medName]));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -69,155 +70,118 @@ export const LogCheckInModal: React.FC<LogCheckInModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white/95 dark:bg-gray-900/95 rounded-3xl shadow-2xl max-w-xl w-full border border-blue-100 dark:border-gray-800 overflow-hidden">
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-5 text-white flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <ClipboardList className="w-6 h-6" />
-            <div>
-              <h3 className="font-bold text-lg">Log Caregiver Check-In & Visit Notes</h3>
-              <p className="text-xs text-blue-100">Document care activities, vitals, and administered doses (UC11)</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-xl transition text-white/80 hover:text-white">
-            <XCircle className="w-6 h-6" />
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="Log a visit"
+      description="Document observations, vitals and medications given during this visit."
+      icon={ClipboardList}
+      maxWidth="max-w-xl"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className="btn btn-secondary">
+            Cancel
           </button>
+          <button type="submit" form="checkin-form" disabled={submitting || !notes.trim() || !patientId} className="btn btn-primary">
+            {submitting && <Loader2 className="animate-spin" />}
+            {submitting ? 'Saving…' : 'Save visit'}
+          </button>
+        </>
+      }
+    >
+      <form id="checkin-form" onSubmit={handleSubmit} className="space-y-5">
+        {error && (
+          <div className="callout callout-danger" role="alert">
+            <AlertCircle aria-hidden />
+            <p>{error}</p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Patient" htmlFor="ci-patient">
+            <select id="ci-patient" value={patientId} onChange={(e) => setPatientId(e.target.value)} className="select" disabled={patients.length === 0}>
+              {patients.length === 0 && <option value="">No assigned patients</option>}
+              {patients.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Visit type" htmlFor="ci-type">
+            <select id="ci-type" value={visitType} onChange={(e) => setVisitType(e.target.value)} className="select">
+              {VISIT_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </Field>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-          {error && (
-            <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 rounded-xl text-xs">
-              {error}
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <fieldset>
+          <legend className="label">
+            Observed vitals <span className="font-normal text-slate-400">(optional)</span>
+          </legend>
+          <div className="grid grid-cols-3 gap-2">
             <div>
-              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                Select Patient
+              <label htmlFor="ci-bp" className="mb-1 block text-xs text-slate-500">
+                Blood pressure
               </label>
-              <select
-                value={patientId}
-                onChange={(e) => setPatientId(e.target.value)}
-                className="w-full p-2.5 border rounded-xl text-sm bg-gray-50 dark:bg-gray-800 dark:border-gray-700 focus:ring-2 focus:ring-blue-500"
-              >
-                {patients.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+              <input id="ci-bp" placeholder="120/80" value={bp} onChange={(e) => setBp(e.target.value)} className="input tabular-nums" />
             </div>
-
             <div>
-              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                Visit Category
+              <label htmlFor="ci-hr" className="mb-1 block text-xs text-slate-500">
+                Heart rate (bpm)
               </label>
-              <select
-                value={visitType}
-                onChange={(e) => setVisitType(e.target.value)}
-                className="w-full p-2.5 border rounded-xl text-sm bg-gray-50 dark:bg-gray-800 dark:border-gray-700 focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="routine_check">Routine Check-In</option>
-                <option value="medication_administration">Medication Administration</option>
-                <option value="vital_monitoring">Vital Signs Monitoring</option>
-                <option value="emergency_response">Emergency Response</option>
-              </select>
+              <input id="ci-hr" inputMode="numeric" placeholder="72" value={heartRate} onChange={(e) => setHeartRate(e.target.value)} className="input tabular-nums" />
             </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
-              <Activity className="w-3.5 h-3.5 text-blue-500" />
-              Observed Vitals (Optional)
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              <input
-                placeholder="BP (e.g. 120/80)"
-                value={bp}
-                onChange={(e) => setBp(e.target.value)}
-                className="p-2 border rounded-xl text-xs bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-              />
-              <input
-                placeholder="HR (bpm, e.g. 72)"
-                value={heartRate}
-                onChange={(e) => setHeartRate(e.target.value)}
-                className="p-2 border rounded-xl text-xs bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-              />
-              <input
-                placeholder="Glucose (mg/dL)"
-                value={bloodSugar}
-                onChange={(e) => setBloodSugar(e.target.value)}
-                className="p-2 border rounded-xl text-xs bg-gray-50 dark:bg-gray-800 dark:border-gray-700"
-              />
-            </div>
-          </div>
-
-          {patientMeds.length > 0 && (
             <div>
-              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
-                <Pill className="w-3.5 h-3.5 text-emerald-500" />
-                Medications Administered
+              <label htmlFor="ci-glu" className="mb-1 block text-xs text-slate-500">
+                Glucose (mg/dL)
               </label>
-              <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-2 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-                {patientMeds.map((med) => {
-                  const isChecked = selectedMeds.includes(med.name);
-                  return (
-                    <label
-                      key={med.id}
-                      className={`flex items-center space-x-2 p-2 rounded-lg text-xs cursor-pointer border transition ${
-                        isChecked
-                          ? 'bg-emerald-50 border-emerald-300 text-emerald-800 dark:bg-emerald-950/40'
-                          : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => toggleMed(med.name)}
-                        className="rounded text-emerald-600"
-                      />
-                      <span className="truncate">{med.name} ({med.dosage})</span>
-                    </label>
-                  );
-                })}
-              </div>
+              <input id="ci-glu" inputMode="numeric" placeholder="95" value={bloodSugar} onChange={(e) => setBloodSugar(e.target.value)} className="input tabular-nums" />
             </div>
-          )}
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-              Visit Observations & Clinical Notes *
-            </label>
-            <textarea
-              rows={4}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Record patient appearance, comfort level, dietary intake, mobility, or any behavioral observations..."
-              className="w-full p-3 border rounded-xl text-sm bg-gray-50 dark:bg-gray-800 dark:border-gray-700 focus:ring-2 focus:ring-blue-500"
-              required
-            />
           </div>
+        </fieldset>
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm font-medium transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting || !notes.trim()}
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-semibold hover:from-blue-700 hover:to-indigo-700 transition shadow-md disabled:opacity-50"
-            >
-              {submitting ? 'Saving...' : 'Submit Check-In'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        {patientMeds.length > 0 && (
+          <fieldset>
+            <legend className="label">Medications given</legend>
+            <div className="flex flex-wrap gap-2">
+              {patientMeds.map((med) => {
+                const isChecked = selectedMeds.includes(med.name);
+                return (
+                  <label
+                    key={med.id}
+                    className={`inline-flex h-8 cursor-pointer items-center gap-2 rounded-md border px-2.5 text-13 transition-colors ${
+                      isChecked
+                        ? 'border-brand-500 bg-brand-50 text-brand-800 dark:bg-brand-950/50 dark:text-brand-200'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'
+                    }`}
+                  >
+                    <input type="checkbox" className="h-3.5 w-3.5" checked={isChecked} onChange={() => toggleMed(med.name)} />
+                    {med.name} <span className="tabular-nums text-slate-500">{med.dosage}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        )}
+
+        <Field label="Observations & notes" htmlFor="ci-notes" required helper="Appearance, comfort, intake, mobility, and anything the care team should know.">
+          <textarea
+            id="ci-notes"
+            rows={4}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="e.g. Alert and comfortable. Ate full breakfast. Mild ankle swelling noted."
+            className="textarea"
+            required
+          />
+        </Field>
+      </form>
+    </Modal>
   );
 };
 

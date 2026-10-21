@@ -1,6 +1,8 @@
 import React from 'react';
-import { Eye, UserPlus, Users } from 'lucide-react';
+import { FlaskConical, Send, UserPlus, Users } from 'lucide-react';
 import { User } from '../../../types';
+import { Avatar, Card, EmptyState } from '../../../components/ui';
+import { roleLabel } from '../../../utils/format';
 import AddPatientModal from '../modals/AddPatientModal';
 
 interface DoctorPatientsTabProps {
@@ -16,6 +18,7 @@ interface DoctorPatientsTabProps {
 
 export const DoctorPatientsTab: React.FC<DoctorPatientsTabProps> = ({
   patients,
+  selectedPatient,
   onSelectPatient,
   showAddPatient,
   setShowAddPatient,
@@ -24,104 +27,108 @@ export const DoctorPatientsTab: React.FC<DoctorPatientsTabProps> = ({
   onOpenPrescription
 }) => {
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-2xl font-bold text-gray-800">My Patients</h3>
-        <button
-          onClick={() => setShowAddPatient(true)}
-          className="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-        >
-          <UserPlus className="h-4 w-4 inline mr-2" />
-          Add Patient
-        </button>
-      </div>
+    <>
+      <AddPatientModal isOpen={showAddPatient} onAddPatient={onAddPatient} onClose={() => setShowAddPatient(false)} />
 
-      {showAddPatient && (
-        <AddPatientModal
-          onAddPatient={onAddPatient}
-          onClose={() => setShowAddPatient(false)}
-        />
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {patients.map((patient) => (
-          <div key={patient.user_id} className="bg-white/80 p-6 rounded-2xl border hover:shadow-lg transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                  {patient.name.charAt(0)}
-                </div>
-                <div>
-                  <h4 className="font-bold text-gray-800">{patient.name}</h4>
-                  <p className="text-sm text-gray-600">Age: {patient.age}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => onSelectPatient(patient)}
-                className="text-blue-600 hover:text-blue-800 transition-colors p-1"
-                title="Select Patient"
-              >
-                <Eye className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Email:</span>
-                <span className="font-medium truncate ml-2">{patient.email}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Role:</span>
-                <span className="font-medium capitalize">{patient.relationship || patient.role}</span>
-              </div>
-              {patient.code && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Code:</span>
-                  <span className="font-medium">{patient.code}</span>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-4 flex space-x-2">
-              <button
-                onClick={() => {
-                  onSelectPatient(patient);
-                  onOpenLabResults(patient);
-                }}
-                className="flex-1 bg-green-100 text-green-700 py-2 px-3 rounded-lg text-sm hover:bg-green-200 transition-colors font-medium"
-              >
-                View Labs
-              </button>
-              <button
-                onClick={() => {
-                  onSelectPatient(patient);
-                  onOpenPrescription(patient);
-                }}
-                className="flex-1 bg-purple-100 text-purple-700 py-2 px-3 rounded-lg text-sm hover:bg-purple-200 transition-colors font-medium"
-              >
-                Prescribe
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {patients.length === 0 && (
-        <div className="bg-white/80 p-8 rounded-2xl border text-center">
-          <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h4 className="text-lg font-semibold text-gray-600 mb-2">No Patients Yet</h4>
-          <p className="text-gray-500 mb-4">Add patients using their unique patient codes to start managing their healthcare.</p>
-          <button
-            onClick={() => setShowAddPatient(true)}
-            className="bg-blue-600 text-white px-6 py-2 rounded-xl hover:bg-blue-700 transition-colors"
-          >
-            Add Your First Patient
+      <Card
+        title="Patient panel"
+        subtitle={`${patients.length} patients`}
+        flush
+        actions={
+          <button type="button" onClick={() => setShowAddPatient(true)} className="btn btn-primary btn-sm">
+            <UserPlus />
+            Add patient
           </button>
-        </div>
-      )}
-    </div>
+        }
+      >
+        {patients.length === 0 ? (
+          <EmptyState
+            icon={Users}
+            title="No patients yet"
+            description="Add patients using their unique patient code to start managing their care."
+            action={
+              <button type="button" onClick={() => setShowAddPatient(true)} className="btn btn-primary">
+                <UserPlus />
+                Add your first patient
+              </button>
+            }
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Patient</th>
+                  <th className="hidden md:table-cell">Contact</th>
+                  <th className="hidden sm:table-cell">Code</th>
+                  <th className="w-0 text-right">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {patients.map((patient) => {
+                  const focused = selectedPatient?.user_id === patient.user_id;
+                  return (
+                    <tr key={patient.user_id} className={focused ? 'bg-brand-50/50 dark:bg-brand-950/30' : ''}>
+                      <td>
+                        <button
+                          type="button"
+                          onClick={() => onSelectPatient(patient)}
+                          className="flex items-center gap-3 rounded-md text-left"
+                          aria-pressed={focused}
+                          title="Show in clinical overview"
+                        >
+                          <Avatar name={patient.name} size="sm" />
+                          <span className="min-w-0">
+                            <span className="block truncate font-medium text-slate-900 hover:text-brand-700 dark:text-slate-100">
+                              {patient.name}
+                            </span>
+                            <span className="block text-xs text-slate-500">
+                              {patient.age} y · {patient.relationship ? patient.relationship : roleLabel(patient.role)}
+                            </span>
+                          </span>
+                          {focused && <span className="badge badge-brand ml-1">In focus</span>}
+                        </button>
+                      </td>
+                      <td className="hidden max-w-[16rem] truncate md:table-cell">{patient.email}</td>
+                      <td className="hidden font-mono text-xs sm:table-cell">{patient.code || '—'}</td>
+                      <td>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSelectPatient(patient);
+                              onOpenLabResults(patient);
+                            }}
+                            className="btn btn-secondary btn-sm"
+                          >
+                            <FlaskConical />
+                            <span className="hidden lg:inline">Labs</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onSelectPatient(patient);
+                              onOpenPrescription(patient);
+                            }}
+                            className="btn btn-secondary btn-sm"
+                          >
+                            <Send />
+                            <span className="hidden lg:inline">Prescribe</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </>
   );
 };
 
 export default DoctorPatientsTab;
-

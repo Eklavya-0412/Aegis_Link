@@ -315,7 +315,8 @@ export const useHealthDataStore = create<HealthDataState>((set, get) => ({
     })),
 
   addVital: async (vital) => {
-    set((s) => ({ vitals: [vital, ...s.vitals] }));
+    // Callers (e.g. useLiveVitals) may already have inserted the reading via setVitals; avoid duplicating it.
+    set((s) => (s.vitals.some((v) => v.id === vital.id) ? s : { vitals: [vital, ...s.vitals] }));
     try {
       await apiClient.post('/vitals', vital);
     } catch (e) {

@@ -1,6 +1,9 @@
 import React, { useState, type Dispatch, type SetStateAction } from 'react';
-import { AlertTriangle, CheckCircle, Stethoscope, Video, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, RotateCcw, Stethoscope, Video } from 'lucide-react';
 import { Appointment, User } from '../../types';
+import Modal from '../../components/common/Modal';
+import { Field } from '../../components/ui';
+import { useToastStore } from '../../store/toastStore';
 
 interface TelemedicineModalProps {
   onClose: () => void;
@@ -9,29 +12,19 @@ interface TelemedicineModalProps {
   setAppointments: Dispatch<SetStateAction<Appointment[]>>;
 }
 
-const TelemedicineModal: React.FC<TelemedicineModalProps> = ({
-  onClose,
-  selectedMember,
-  appointments,
-  setAppointments
-}) => {
-  const [appointmentType, setAppointmentType] = useState<'consultation' | 'followup' | 'emergency'>(
-    'consultation'
-  );
+const VISIT_TYPES = [
+  { key: 'consultation', label: 'New consultation', icon: Stethoscope },
+  { key: 'followup', label: 'Follow-up', icon: RotateCcw },
+  { key: 'emergency', label: 'Urgent care', icon: AlertTriangle }
+] as const;
+
+const specialties = ['General Medicine', 'Cardiology', 'Dermatology', 'Psychiatry', 'Pediatrics', 'Gynecology', 'Orthopedics', 'Neurology'];
+
+const TelemedicineModal: React.FC<TelemedicineModalProps> = ({ onClose, selectedMember, appointments, setAppointments }) => {
+  const [appointmentType, setAppointmentType] = useState<'consultation' | 'followup' | 'emergency'>('consultation');
   const [selectedSpecialty, setSelectedSpecialty] = useState('');
   const [preferredDate, setPreferredDate] = useState('');
   const [symptoms, setSymptoms] = useState('');
-
-  const specialties = [
-    'General Medicine',
-    'Cardiology',
-    'Dermatology',
-    'Psychiatry',
-    'Pediatrics',
-    'Gynecology',
-    'Orthopedics',
-    'Neurology'
-  ];
 
   const handleBooking = () => {
     const newAppointment: Appointment = {
@@ -47,131 +40,106 @@ const TelemedicineModal: React.FC<TelemedicineModalProps> = ({
     };
 
     setAppointments([...appointments, newAppointment]);
-    alert('Telemedicine appointment booked successfully!');
+    useToastStore.getState().showToast('Video consultation booked.', 'success');
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-gradient-to-br from-white/95 to-blue-50/80 backdrop-blur-xl rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-8">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-3">
-              <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-green-500 rounded-xl flex items-center justify-center">
-                <Video className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h3 className="text-2xl font-bold text-gray-800">Telemedicine Consultation</h3>
-                <p className="text-gray-600">Book a virtual appointment with specialists</p>
-              </div>
-            </div>
-            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-              <XCircle className="h-6 w-6 text-gray-500" />
-            </button>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="Book a video consultation"
+      description={`For ${selectedMember?.name || 'this member'}`}
+      icon={Video}
+      maxWidth="max-w-xl"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className="btn btn-secondary">
+            Cancel
+          </button>
+          <button type="button" onClick={handleBooking} disabled={!selectedSpecialty || !preferredDate || !symptoms.trim()} className="btn btn-primary">
+            Book consultation
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-5">
+        {appointmentType === 'emergency' && (
+          <div className="callout callout-danger">
+            <AlertTriangle aria-hidden />
+            <p>If symptoms are severe or life-threatening, call your local emergency number instead of booking online.</p>
           </div>
+        )}
 
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Appointment Type</label>
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { key: 'consultation', label: 'New Consultation', icon: Stethoscope },
-                  { key: 'followup', label: 'Follow-up', icon: CheckCircle },
-                  { key: 'emergency', label: 'Urgent Care', icon: AlertTriangle }
-                ].map(({ key, label, icon: Icon }) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setAppointmentType(key as any)}
-                    className={`p-4 rounded-xl border-2 transition-all duration-300 ${
-                      appointmentType === key
-                        ? 'bg-blue-500 text-white border-blue-500 shadow-lg'
-                        : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'
-                    }`}
-                  >
-                    <Icon className="h-6 w-6 mx-auto mb-2" />
-                    <p className="text-sm font-medium">{label}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Medical Specialty</label>
-              <select
-                className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
-                value={selectedSpecialty}
-                onChange={(e) => setSelectedSpecialty(e.target.value)}
-                required
+        <fieldset>
+          <legend className="label">Visit type</legend>
+          <div className="grid grid-cols-3 gap-2">
+            {VISIT_TYPES.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setAppointmentType(key)}
+                aria-pressed={appointmentType === key}
+                className={`flex flex-col items-center gap-1.5 rounded-lg border px-2 py-3 text-13 font-medium transition-colors ${
+                  appointmentType === key
+                    ? 'border-brand-500 bg-brand-50 text-brand-800 dark:bg-brand-950/50 dark:text-brand-200'
+                    : 'border-slate-200 text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:text-slate-300'
+                }`}
               >
-                <option value="">Select Specialty</option>
-                {specialties.map((specialty) => (
-                  <option key={specialty} value={specialty}>
-                    {specialty}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Preferred Date & Time</label>
-              <input
-                type="datetime-local"
-                className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
-                value={preferredDate}
-                onChange={(e) => setPreferredDate(e.target.value)}
-                min={new Date().toISOString().slice(0, 16)}
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Symptoms & Reason for Visit</label>
-              <textarea
-                className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-300"
-                rows={4}
-                placeholder="Please describe your symptoms and reason for the consultation..."
-                value={symptoms}
-                onChange={(e) => setSymptoms(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="bg-gradient-to-r from-blue-50 to-green-50 p-6 rounded-2xl border border-blue-200">
-              <h4 className="font-bold text-gray-800 mb-3">Consultation Features:</h4>
-              <ul className="space-y-2 text-sm text-gray-700">
-                <li className="flex items-center space-x-2">
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                  <span>HD video consultation with board-certified doctors</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                  <span>Digital prescription delivery to your pharmacy</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                  <span>Follow-up care and health monitoring</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                  <span>Integration with your health records</span>
-                </li>
-              </ul>
-            </div>
-
-            <button
-              onClick={handleBooking}
-              disabled={!selectedSpecialty || !preferredDate || !symptoms.trim()}
-              className="w-full bg-gradient-to-r from-blue-500 to-green-500 text-white py-4 rounded-xl hover:from-blue-600 hover:to-green-600 transition-all duration-300 disabled:opacity-50 font-semibold text-lg shadow-lg"
-            >
-              Book Telemedicine Appointment
-            </button>
+                <Icon className="h-4 w-4" aria-hidden />
+                {label}
+              </button>
+            ))}
           </div>
+        </fieldset>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Specialty" htmlFor="tm-specialty" required>
+            <select id="tm-specialty" className="select" value={selectedSpecialty} onChange={(e) => setSelectedSpecialty(e.target.value)}>
+              <option value="">Select a specialty</option>
+              {specialties.map((specialty) => (
+                <option key={specialty} value={specialty}>
+                  {specialty}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Preferred date & time" htmlFor="tm-date" required>
+            <input
+              id="tm-date"
+              type="datetime-local"
+              className="input tabular-nums"
+              value={preferredDate}
+              onChange={(e) => setPreferredDate(e.target.value)}
+              min={new Date().toISOString().slice(0, 16)}
+            />
+          </Field>
         </div>
+
+        <Field label="Symptoms & reason for visit" htmlFor="tm-symptoms" required helper="Shared with the consulting clinician.">
+          <textarea
+            id="tm-symptoms"
+            className="textarea"
+            rows={4}
+            placeholder="Describe your symptoms and when they started…"
+            value={symptoms}
+            onChange={(e) => setSymptoms(e.target.value)}
+          />
+        </Field>
+
+        <ul className="grid grid-cols-1 gap-2 text-13 text-slate-600 dark:text-slate-400 sm:grid-cols-2">
+          {['Video consultation with a licensed clinician', 'Digital prescription to your pharmacy', 'Follow-up care and monitoring', 'Linked to your health record'].map(
+            (f) => (
+              <li key={f} className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+                {f}
+              </li>
+            )
+          )}
+        </ul>
       </div>
-    </div>
+    </Modal>
   );
 };
 
 export default TelemedicineModal;
-

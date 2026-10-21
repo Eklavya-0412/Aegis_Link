@@ -1,14 +1,23 @@
 import React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
+import { LucideIcon, X } from 'lucide-react';
 
 export interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title?: string;
-  description?: string;
+  title?: React.ReactNode;
+  description?: React.ReactNode;
   children: React.ReactNode;
+  /** Tailwind max-width class, e.g. `max-w-lg`. */
   maxWidth?: string;
+  icon?: LucideIcon;
+  /** Tailwind classes for the icon tile (background + text colour). */
+  iconClassName?: string;
+  /** Extra content rendered at the right of the header, before the close button. */
+  headerExtra?: React.ReactNode;
+  footer?: React.ReactNode;
+  /** Remove body padding (for full-bleed content such as tables). */
+  flush?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -17,39 +26,49 @@ export const Modal: React.FC<ModalProps> = ({
   title,
   description,
   children,
-  maxWidth = 'max-w-2xl'
+  maxWidth = 'max-w-2xl',
+  icon: Icon,
+  iconClassName = 'bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300',
+  headerExtra,
+  footer,
+  flush
 }) => {
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 transition-opacity duration-200" />
-        <Dialog.Content
-          className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] ${maxWidth} bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 p-6 z-50 max-h-[90vh] overflow-y-auto focus:outline-none`}
-        >
-          <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-gray-800 mb-4">
-            <div>
-              {title && (
-                <Dialog.Title className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                  {title}
-                </Dialog.Title>
+        <Dialog.Overlay className="modal-overlay" />
+        <Dialog.Content className={`modal-panel ${maxWidth}`}>
+          <div className="flex items-start gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+            {Icon && (
+              <span className={`icon-tile ${iconClassName}`}>
+                <Icon aria-hidden />
+              </span>
+            )}
+            <div className="min-w-0 flex-1">
+              {title ? (
+                <Dialog.Title className="text-base font-semibold leading-6 text-slate-900 dark:text-slate-50">{title}</Dialog.Title>
+              ) : (
+                <Dialog.Title className="sr-only">Dialog</Dialog.Title>
               )}
-              {description && (
-                <Dialog.Description className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                  {description}
-                </Dialog.Description>
+              {description ? (
+                <Dialog.Description className="mt-0.5 text-13 text-slate-500 dark:text-slate-400">{description}</Dialog.Description>
+              ) : (
+                <Dialog.Description className="sr-only">{typeof title === 'string' ? title : 'Dialog'}</Dialog.Description>
               )}
             </div>
+            {headerExtra}
             <Dialog.Close asChild>
-              <button
-                onClick={onClose}
-                aria-label="Close"
-                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-              >
-                <X className="h-5 w-5" />
+              <button type="button" aria-label="Close dialog" className="btn btn-ghost btn-icon btn-sm -mr-1.5 -mt-0.5">
+                <X />
               </button>
             </Dialog.Close>
           </div>
-          <div>{children}</div>
+          <div className={`min-h-0 flex-1 overflow-y-auto ${flush ? '' : 'px-5 py-5'}`}>{children}</div>
+          {footer && (
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/60 px-5 py-3 dark:border-slate-800 dark:bg-slate-900">
+              {footer}
+            </div>
+          )}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
@@ -57,4 +76,3 @@ export const Modal: React.FC<ModalProps> = ({
 };
 
 export default Modal;
-

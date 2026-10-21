@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { XCircle } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { User } from '../../../types';
+import Modal from '../../../components/common/Modal';
+import { Field } from '../../../components/ui';
 
 interface PrescriptionModalProps {
   patients: User[];
@@ -33,61 +35,77 @@ export const PrescriptionModal: React.FC<PrescriptionModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white/95 rounded-2xl shadow-2xl max-w-xl w-full">
-        <div className="p-6 border-b flex items-center justify-between">
-          <h3 className="text-xl font-bold">Send Prescription</h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-            <XCircle className="h-6 w-6 text-gray-500" />
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="New prescription"
+      description="Review the details carefully before sending."
+      icon={Send}
+      maxWidth="max-w-lg"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className="btn btn-secondary">
+            Cancel
           </button>
-        </div>
-        <div className="p-6 space-y-3">
+          <button type="button" onClick={handleSend} disabled={!prescriptionData.medication.trim()} className="btn btn-primary">
+            <Send />
+            Send prescription
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <Field label="Patient" htmlFor="rx-patient" required>
           <select
-            className="w-full p-3 border rounded-xl"
+            id="rx-patient"
+            className="select"
             value={selectedPatient?.user_id || ''}
             onChange={(e) => {
               const p = patients.find((m) => m.user_id === e.target.value);
               onSelectPatient(p || null);
             }}
           >
-            <option value="">Select Patient</option>
+            <option value="">Select a patient</option>
             {patients.map((m) => (
               <option key={m.user_id} value={m.user_id}>
                 {m.name}
               </option>
             ))}
           </select>
-          <input
-            className="w-full p-3 border rounded-xl"
-            placeholder="Medication"
-            value={prescriptionData.medication}
-            onChange={(e) => setPrescriptionData({ ...prescriptionData, medication: e.target.value })}
-          />
-          <input
-            className="w-full p-3 border rounded-xl"
-            placeholder="Dosage"
-            value={prescriptionData.dosage}
-            onChange={(e) => setPrescriptionData({ ...prescriptionData, dosage: e.target.value })}
-          />
+        </Field>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          <Field label="Medication" htmlFor="rx-med" required>
+            <input
+              id="rx-med"
+              className="input"
+              placeholder="e.g. Amlodipine"
+              value={prescriptionData.medication}
+              onChange={(e) => setPrescriptionData({ ...prescriptionData, medication: e.target.value })}
+            />
+          </Field>
+          <Field label="Dosage" htmlFor="rx-dose">
+            <input
+              id="rx-dose"
+              className="input tabular-nums"
+              placeholder="e.g. 5 mg"
+              value={prescriptionData.dosage}
+              onChange={(e) => setPrescriptionData({ ...prescriptionData, dosage: e.target.value })}
+            />
+          </Field>
+        </div>
+        <Field label="Instructions" htmlFor="rx-instructions">
           <textarea
-            className="w-full p-3 border rounded-xl"
+            id="rx-instructions"
+            className="textarea"
             rows={3}
-            placeholder="Instructions"
+            placeholder="e.g. Take one tablet each morning with food"
             value={prescriptionData.instructions}
             onChange={(e) => setPrescriptionData({ ...prescriptionData, instructions: e.target.value })}
           />
-          <button
-            onClick={handleSend}
-            disabled={!prescriptionData.medication.trim()}
-            className="w-full bg-purple-600 text-white py-3 rounded-xl disabled:opacity-50 hover:bg-purple-700 transition-colors"
-          >
-            Send
-          </button>
-        </div>
+        </Field>
       </div>
-    </div>
+    </Modal>
   );
 };
 
 export default PrescriptionModal;
-

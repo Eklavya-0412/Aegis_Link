@@ -1,23 +1,17 @@
 import React from 'react';
 import BarChart from '../../../components/charts/BarChart';
 import DonutChart from '../../../components/charts/DonutChart';
+import { CHART_COLORS } from '../../../components/charts/ChartFrame';
 import { AlertItem, CaregiverPatient } from '../types';
 
 interface CaregiverChartsProps {
   patients: CaregiverPatient[];
   alerts: AlertItem[];
-  adherenceRateData: number[];
+  adherenceRateData: (number | null)[];
 }
 
-export const CaregiverCharts: React.FC<CaregiverChartsProps> = ({
-  patients,
-  alerts,
-  adherenceRateData
-}) => {
-  const patientMedicationData = patients.map((p) => p.medication_count);
-  const patientMedicationLabels = patients.map((p) => p.name);
-  const patientAppointmentData = patients.map((p) => p.appointment_count);
-  const patientAppointmentLabels = patients.map((p) => p.name);
+export const CaregiverCharts: React.FC<CaregiverChartsProps> = ({ patients, alerts, adherenceRateData }) => {
+  const names = patients.map((p) => p.name.split(' ')[0]);
 
   const alertPriorityData = [
     alerts.filter((a) => a.priority === 'emergency').length,
@@ -25,46 +19,43 @@ export const CaregiverCharts: React.FC<CaregiverChartsProps> = ({
     alerts.filter((a) => a.priority === 'normal').length,
     alerts.filter((a) => a.priority === 'low').length
   ];
-  const alertPriorityLabels = ['Emergency', 'High', 'Normal', 'Low'];
-  const alertPriorityColors = ['#ef4444', '#f97316', '#eab308', '#10b981'];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-      {patients.length > 0 && (
-        <BarChart
-          values={patientMedicationData}
-          labels={patientMedicationLabels}
-          color="#10b981"
-          title="Medications by Patient"
-        />
-      )}
-      {patients.length > 0 && (
-        <BarChart
-          values={patientAppointmentData}
-          labels={patientAppointmentLabels}
-          color="#3b82f6"
-          title="Appointments by Patient"
-        />
-      )}
-      {alerts.length > 0 && (
-        <DonutChart
-          values={alertPriorityData}
-          labels={alertPriorityLabels}
-          colors={alertPriorityColors}
-          title="Alerts by Priority"
-        />
-      )}
-      {patients.length > 0 && (
-        <BarChart
-          values={adherenceRateData}
-          labels={patientMedicationLabels}
-          color="#8b5cf6"
-          title="Adherence Rate by Patient (%)"
-        />
-      )}
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+      <DonutChart
+        title="Alerts by severity"
+        values={alertPriorityData}
+        labels={['Emergency', 'High', 'Routine', 'Low']}
+        colors={[CHART_COLORS.red, CHART_COLORS.amber, CHART_COLORS.sky, '#D6D0C7']}
+        centerLabel="alerts"
+        emptyMessage="No alerts recorded"
+      />
+      <BarChart
+        title="Medication adherence today"
+        subtitle="Share of scheduled doses marked as taken"
+        values={adherenceRateData.map((v) => v ?? 0)}
+        labels={names}
+        unit="%"
+        max={100}
+        color={CHART_COLORS.emerald}
+        emptyMessage="No doses taken yet today"
+      />
+      <BarChart
+        title="Medications by patient"
+        values={patients.map((p) => p.medication_count)}
+        labels={names}
+        color={CHART_COLORS.brand}
+        emptyMessage="No medications on file"
+      />
+      <BarChart
+        title="Appointments by patient"
+        values={patients.map((p) => p.appointment_count)}
+        labels={names}
+        color={CHART_COLORS.sky}
+        emptyMessage="No appointments on file"
+      />
     </div>
   );
 };
 
 export default CaregiverCharts;
-

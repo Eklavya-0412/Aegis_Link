@@ -1,7 +1,10 @@
 import React from 'react';
-import { Award, Gift, Heart, Pill, Target, XCircle } from 'lucide-react';
+import { Award, Gift, HeartPulse, Pill, Target } from 'lucide-react';
 import { Coupon, User } from '../../types';
 import { sampleCoupons } from '../../constants/sampleCoupons';
+import Modal from '../../components/common/Modal';
+import { useToastStore } from '../../store/toastStore';
+import { formatDate } from '../../utils/format';
 
 interface PointsStoreModalProps {
   onClose: () => void;
@@ -9,11 +12,14 @@ interface PointsStoreModalProps {
   setCurrentUser: (user: User | null) => void;
 }
 
-const PointsStoreModal: React.FC<PointsStoreModalProps> = ({
-  onClose,
-  currentUser,
-  setCurrentUser
-}) => {
+const EARN = [
+  { icon: Pill, label: 'Take medications', pts: 10 },
+  { icon: HeartPulse, label: 'Log vitals', pts: 5 },
+  { icon: Target, label: 'Complete goals', pts: 50 },
+  { icon: Award, label: 'Win challenges', pts: 100 }
+];
+
+const PointsStoreModal: React.FC<PointsStoreModalProps> = ({ onClose, currentUser, setCurrentUser }) => {
   const userPoints = currentUser?.points || 0;
 
   const redeemCoupon = (coupon: Coupon) => {
@@ -22,113 +28,74 @@ const PointsStoreModal: React.FC<PointsStoreModalProps> = ({
         const updatedUser = { ...currentUser, points: userPoints - coupon.points_required };
         setCurrentUser(updatedUser);
       }
-      alert(
-        `Successfully redeemed: ${coupon.title}! You now have ${
-          userPoints - coupon.points_required
-        } points.`
-      );
+      useToastStore
+        .getState()
+        .showToast(`Redeemed "${coupon.title}". You now have ${userPoints - coupon.points_required} points.`, 'success');
       onClose();
     } else {
-      alert(`You need ${coupon.points_required - userPoints} more points to redeem this coupon.`);
+      useToastStore.getState().showToast(`You need ${coupon.points_required - userPoints} more points for this reward.`, 'info');
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-gradient-to-br from-white/95 to-yellow-50/80 backdrop-blur-xl rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-8">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center space-x-3">
-              <div className="h-12 w-12 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-xl flex items-center justify-center">
-                <Gift className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h3 className="text-2xl font-bold text-gray-800">Points Store</h3>
-                <p className="text-gray-600">Redeem your wellness points for rewards</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-600">Your Points</p>
-              <p className="text-3xl font-bold text-yellow-600">{userPoints}</p>
-            </div>
-            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-              <XCircle className="h-6 w-6 text-gray-500" />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {sampleCoupons.map((coupon) => (
-              <div
-                key={coupon.id}
-                className="bg-white/80 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-yellow-100"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h4 className="font-bold text-gray-800 text-lg mb-2">{coupon.title}</h4>
-                    <p className="text-sm text-gray-600 mb-3">{coupon.description}</p>
-                    <span className="inline-block bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-medium">
-                      {coupon.category}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                  <div>
-                    <p className="text-sm text-gray-600">Cost</p>
-                    <p className="text-2xl font-bold text-yellow-600">
-                      {coupon.points_required} pts
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => redeemCoupon(coupon)}
-                    disabled={userPoints < coupon.points_required}
-                    className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg ${
-                      userPoints >= coupon.points_required
-                        ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white hover:from-yellow-600 hover:to-orange-600 transform hover:scale-105'
-                        : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                    }`}
-                  >
-                    Redeem
-                  </button>
-                </div>
-
-                <p className="text-xs text-gray-500 mt-2">
-                  Expires: {new Date(coupon.expires_at).toLocaleDateString()}
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="Wellness rewards"
+      description="Redeem points earned by keeping up with your care plan."
+      icon={Gift}
+      iconClassName="bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
+      maxWidth="max-w-2xl"
+      headerExtra={
+        <div className="mr-2 text-right">
+          <p className="text-2xs font-medium text-slate-500">Balance</p>
+          <p className="text-lg font-semibold leading-tight tabular-nums text-slate-900 dark:text-slate-50">{userPoints}</p>
+        </div>
+      }
+    >
+      <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+        {sampleCoupons.map((coupon) => {
+          const affordable = userPoints >= coupon.points_required;
+          return (
+            <li key={coupon.id} className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center">
+              <div className="min-w-0 flex-1">
+                <p className="flex flex-wrap items-center gap-2 text-13 font-medium text-slate-900 dark:text-slate-100">
+                  {coupon.title}
+                  <span className="badge badge-neutral">{coupon.category}</span>
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {coupon.description} · Expires {formatDate(coupon.expires_at)}
                 </p>
               </div>
-            ))}
-          </div>
+              <div className="flex items-center gap-3">
+                <span className="text-13 font-semibold tabular-nums text-slate-900 dark:text-slate-100">{coupon.points_required} pts</span>
+                <button
+                  type="button"
+                  onClick={() => redeemCoupon(coupon)}
+                  disabled={!affordable}
+                  className={`btn btn-sm ${affordable ? 'btn-primary' : 'btn-secondary'}`}
+                  title={affordable ? undefined : `${coupon.points_required - userPoints} more points needed`}
+                >
+                  Redeem
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
 
-          <div className="mt-8 bg-gradient-to-r from-yellow-50 to-orange-50 p-6 rounded-2xl border border-yellow-200">
-            <h4 className="font-bold text-gray-800 mb-3">How to Earn Points:</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-              <div className="bg-white/60 p-4 rounded-xl">
-                <Pill className="h-8 w-8 text-blue-500 mx-auto mb-2" />
-                <p className="text-sm font-medium">Take Medications</p>
-                <p className="text-xs text-gray-600">10 pts each</p>
-              </div>
-              <div className="bg-white/60 p-4 rounded-xl">
-                <Heart className="h-8 w-8 text-red-500 mx-auto mb-2" />
-                <p className="text-sm font-medium">Log Vitals</p>
-                <p className="text-xs text-gray-600">5 pts each</p>
-              </div>
-              <div className="bg-white/60 p-4 rounded-xl">
-                <Target className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                <p className="text-sm font-medium">Complete Goals</p>
-                <p className="text-xs text-gray-600">50 pts each</p>
-              </div>
-              <div className="bg-white/60 p-4 rounded-xl">
-                <Award className="h-8 w-8 text-purple-500 mx-auto mb-2" />
-                <p className="text-sm font-medium">Win Challenges</p>
-                <p className="text-xs text-gray-600">100 pts each</p>
-              </div>
-            </div>
+      <p className="eyebrow mb-3 mt-6">How to earn points</p>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {EARN.map((e) => (
+          <div key={e.label} className="surface-muted px-3 py-3">
+            <e.icon className="h-4 w-4 text-brand-700 dark:text-brand-400" aria-hidden />
+            <p className="mt-2 text-13 font-medium text-slate-800 dark:text-slate-200">{e.label}</p>
+            <p className="text-xs tabular-nums text-slate-500">{e.pts} pts each</p>
           </div>
-        </div>
+        ))}
       </div>
-    </div>
+    </Modal>
   );
 };
 
 export default PointsStoreModal;
-

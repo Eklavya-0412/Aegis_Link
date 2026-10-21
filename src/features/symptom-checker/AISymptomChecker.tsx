@@ -1,6 +1,8 @@
 import React, { useState, useCallback } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { Activity, XCircle } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
+import { Activity } from 'lucide-react';
+import Modal from '../../components/common/Modal';
+import { useToastStore } from '../../store/toastStore';
 import { BodyPart, SymptomAssessment, SymptomHistoryEntry } from './types';
 import { SymptomInputStep } from './SymptomInputStep';
 import { SeverityStep } from './SeverityStep';
@@ -27,11 +29,11 @@ const bodyParts: BodyPart[] = [
     y: 180,
     symptoms: ['stomach pain', 'indigestion', 'bloating']
   },
-  { id: 'arm', name: 'Arm', x: 100, y: 150, symptoms: ['arm pain', 'numbness', 'weakness'] },
-  { id: 'leg', name: 'Leg', x: 130, y: 250, symptoms: ['leg pain', 'swelling', 'cramps'] }
+  { id: 'arm', name: 'Arm', x: 120, y: 132, symptoms: ['arm pain', 'numbness', 'weakness'] },
+  { id: 'leg', name: 'Leg', x: 142, y: 215, symptoms: ['leg pain', 'swelling', 'cramps'] }
 ];
 
-const steps = ['Body Area', 'Severity', 'Duration', 'Assessment'];
+const steps = ['Body area', 'Severity', 'Duration', 'Guidance'];
 
 export const AISymptomChecker: React.FC<AISymptomCheckerProps> = ({ onClose }) => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -124,7 +126,7 @@ export const AISymptomChecker: React.FC<AISymptomCheckerProps> = ({ onClose }) =
       assessment
     };
     setSymptomHistory((prev) => [newEntry, ...prev].slice(0, 10));
-    alert('Emergency contacts have been notified with your symptom assessment.');
+    useToastStore.getState().showToast('Your emergency contacts have been notified with this assessment.', 'warning');
     onClose();
   };
 
@@ -137,107 +139,94 @@ export const AISymptomChecker: React.FC<AISymptomCheckerProps> = ({ onClose }) =
       assessment
     };
     setSymptomHistory((prev) => [newEntry, ...prev].slice(0, 10));
-    alert('Your doctor has been notified and will contact you shortly.');
+    useToastStore.getState().showToast('Your physician has been notified and will contact you.', 'success');
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-50">
-      <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -10 }}
-        transition={{ duration: 0.35 }}
-        className="relative max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto"
-      >
-        <div className="absolute -inset-[1px] rounded-[28px] bg-gradient-to-br from-purple-400 via-pink-300 to-fuchsia-400 opacity-60 blur animate-pulse" />
-        <div className="relative bg-white/95 backdrop-blur-xl rounded-[28px] shadow-2xl">
-          <div className="p-4 sm:p-6 md:p-8">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-3">
-                <div className="h-12 w-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center animate-pulse">
-                  <Activity className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                    AI Symptom Checker
-                  </h3>
-                  <p className="text-gray-600">Intelligent health assessment with pattern recognition</p>
-                </div>
-              </div>
-              <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-                <XCircle className="h-6 w-6 text-gray-500" />
-              </button>
-            </div>
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="Symptom checker"
+      description="Answer a few questions for suggested next steps. This is not a diagnosis."
+      icon={Activity}
+      iconClassName="bg-violet-50 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300"
+      maxWidth="max-w-3xl"
+    >
+      {/* Step indicator */}
+      <ol className="mb-6 flex items-center gap-2" aria-label="Progress">
+        {steps.map((s, i) => {
+          const n = i + 1;
+          const done = n < currentStep;
+          const active = n === currentStep;
+          return (
+            <li key={s} className="flex min-w-0 flex-1 items-center gap-2" aria-current={active ? 'step' : undefined}>
+              <span
+                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${
+                  active
+                    ? 'bg-brand-700 text-white'
+                    : done
+                    ? 'bg-brand-100 text-brand-800 dark:bg-brand-950 dark:text-brand-200'
+                    : 'bg-slate-100 text-slate-500 dark:bg-slate-800'
+                }`}
+              >
+                {n}
+              </span>
+              <span
+                className={`hidden truncate text-13 sm:block ${
+                  active ? 'font-medium text-slate-900 dark:text-slate-100' : 'text-slate-500'
+                }`}
+              >
+                {s}
+              </span>
+              {i < steps.length - 1 && <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" aria-hidden />}
+            </li>
+          );
+        })}
+      </ol>
 
-            {/* Step indicator */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between text-sm text-gray-600">
-                {steps.map((s, i) => (
-                  <div key={s} className="flex-1 flex items-center">
-                    <div
-                      className={`h-8 px-3 rounded-full mr-2 flex items-center justify-center font-semibold ${
-                        i + 1 <= currentStep
-                          ? 'bg-purple-100 text-purple-700'
-                          : 'bg-gray-100 text-gray-500'
-                      }`}
-                    >
-                      {i + 1}
-                    </div>
-                    <span className={i + 1 <= currentStep ? 'text-purple-700' : ''}>{s}</span>
-                    {i < steps.length - 1 && (
-                      <div className="flex-1 h-1 mx-3 bg-gradient-to-r from-gray-200 to-purple-200 rounded-full" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+      <AnimatePresence mode="wait">
+        {currentStep === 1 && (
+          <SymptomInputStep
+            bodyParts={bodyParts}
+            selectedBodyPart={selectedBodyPart}
+            setSelectedBodyPart={setSelectedBodyPart}
+            symptoms={symptoms}
+            setSymptoms={setSymptoms}
+            onNext={() => setCurrentStep(2)}
+          />
+        )}
 
-            <AnimatePresence mode="wait">
-              {currentStep === 1 && (
-                <SymptomInputStep
-                  bodyParts={bodyParts}
-                  selectedBodyPart={selectedBodyPart}
-                  setSelectedBodyPart={setSelectedBodyPart}
-                  symptoms={symptoms}
-                  setSymptoms={setSymptoms}
-                  onNext={() => setCurrentStep(2)}
-                />
-              )}
+        {currentStep === 2 && (
+          <SeverityStep
+            symptomSeverity={symptomSeverity}
+            setSymptomSeverity={setSymptomSeverity}
+            onBack={() => setCurrentStep(1)}
+            onNext={() => setCurrentStep(3)}
+          />
+        )}
 
-              {currentStep === 2 && (
-                <SeverityStep
-                  symptomSeverity={symptomSeverity}
-                  setSymptomSeverity={setSymptomSeverity}
-                  onBack={() => setCurrentStep(1)}
-                  onNext={() => setCurrentStep(3)}
-                />
-              )}
+        {currentStep === 3 && (
+          <DurationStep
+            duration={duration}
+            setDuration={setDuration}
+            additionalNotes={additionalNotes}
+            setAdditionalNotes={setAdditionalNotes}
+            onBack={() => setCurrentStep(2)}
+            onNext={() => setCurrentStep(4)}
+          />
+        )}
 
-              {currentStep === 3 && (
-                <DurationStep
-                  duration={duration}
-                  setDuration={setDuration}
-                  additionalNotes={additionalNotes}
-                  setAdditionalNotes={setAdditionalNotes}
-                  onBack={() => setCurrentStep(2)}
-                  onNext={() => setCurrentStep(4)}
-                />
-              )}
-
-              {currentStep === 4 && (
-                <AnalysisResultStep
-                  assessment={getAIRecommendation(symptoms, symptomSeverity, duration)}
-                  onAlertCaregivers={handleAlertCaregivers}
-                  onContactDoctor={handleContactDoctor}
-                  onRestart={handleRestart}
-                />
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-      </motion.div>
-    </div>
+        {currentStep === 4 && (
+          <AnalysisResultStep
+            assessment={getAIRecommendation(symptoms, symptomSeverity, duration)}
+            onAlertCaregivers={handleAlertCaregivers}
+            onContactDoctor={handleContactDoctor}
+            onRestart={handleRestart}
+          />
+        )}
+      </AnimatePresence>
+    </Modal>
   );
 };
 

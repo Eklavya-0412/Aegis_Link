@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Check, Edit2, Pill, ShieldCheck, XCircle } from 'lucide-react';
+import { Check, History, Loader2, Pill, Save } from 'lucide-react';
 import { Medication, User } from '../../../types';
 import { updatePatientMedicationDosage } from '../../../services/clinicalService';
 import { useToastStore } from '../../../store/toastStore';
+import Modal from '../../../components/common/Modal';
+import { EmptyState, Field } from '../../../components/ui';
 
 interface ManagePatientMedsModalProps {
   patient: User;
@@ -11,12 +13,7 @@ interface ManagePatientMedsModalProps {
   onMedicationUpdated: (updatedMed: Medication) => void;
 }
 
-export const ManagePatientMedsModal: React.FC<ManagePatientMedsModalProps> = ({
-  patient,
-  medications,
-  onClose,
-  onMedicationUpdated
-}) => {
+export const ManagePatientMedsModal: React.FC<ManagePatientMedsModalProps> = ({ patient, medications, onClose, onMedicationUpdated }) => {
   const patientMeds = medications.filter((m) => m.member_id === patient.user_id);
   const [selectedMed, setSelectedMed] = useState<Medication | null>(patientMeds[0] || null);
   const [dosage, setDosage] = useState(patientMeds[0]?.dosage || '');
@@ -40,157 +37,115 @@ export const ManagePatientMedsModal: React.FC<ManagePatientMedsModalProps> = ({
     setSuccessNotice('');
 
     try {
-      const res = await updatePatientMedicationDosage(patient.user_id, selectedMed.id, {
+      await updatePatientMedicationDosage(patient.user_id, selectedMed.id, {
         dosage: dosage.trim(),
-        frequency: frequency.trim(),
+        frequency: frequency.trim()
       });
 
       const updatedMed: Medication = {
         ...selectedMed,
         dosage: dosage.trim(),
-        frequency: frequency.trim(),
+        frequency: frequency.trim()
       };
 
       onMedicationUpdated(updatedMed);
-      setSuccessNotice(`Dosage for ${selectedMed.name} updated to "${dosage.trim()}". Cryptographic audit trail entry logged.`);
-      showToast(`Updated ${selectedMed.name} to ${dosage.trim()}. Audit logged.`, 'success');
+      setSuccessNotice(`${selectedMed.name} updated to ${dosage.trim()}. The change was recorded in the activity log.`);
+      showToast(`Updated ${selectedMed.name} to ${dosage.trim()}.`, 'success');
     } catch (err: any) {
-      showToast(err?.message || 'Failed to update medication dosage', 'error');
+      showToast(err?.response?.data?.detail || err?.message || 'Failed to update medication dosage', 'error');
     } finally {
       setSaving(false);
     }
   };
 
+  const changed = !!selectedMed && (dosage.trim() !== selectedMed.dosage || frequency.trim() !== selectedMed.frequency);
+
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white/95 dark:bg-gray-900/95 rounded-3xl shadow-2xl max-w-2xl w-full border border-emerald-100 dark:border-gray-800 overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-5 text-white flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Pill className="w-6 h-6" />
-            <div>
-              <h3 className="font-bold text-lg">Manage Patient Medications</h3>
-              <p className="text-xs text-emerald-100">Caretaker medication oversight & dose adjustments (TC_06)</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-xl transition text-white/80 hover:text-white">
-            <XCircle className="w-6 h-6" />
+    <Modal
+      isOpen
+      onClose={onClose}
+      title="Manage medications"
+      description={`Adjust dose or schedule for ${patient.name}. Changes are attributed to you.`}
+      icon={Pill}
+      maxWidth="max-w-2xl"
+      footer={
+        <>
+          <button type="button" onClick={onClose} className="btn btn-secondary">
+            Close
           </button>
-        </div>
-
-        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Medication List */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                Prescriptions for {patient.name}
-              </h4>
-              <span className="text-xs text-gray-400 font-mono">
-                PID: {patient.patient_id || patient.user_id.slice(0, 8)}
-              </span>
-            </div>
-
-            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+          <button type="submit" form="manage-med-form" disabled={saving || !selectedMed || !dosage.trim() || !changed} className="btn btn-primary">
+            {saving ? <Loader2 className="animate-spin" /> : <Save />}
+            {saving ? 'Saving…' : 'Save change'}
+          </button>
+        </>
+      }
+    >
+      {patientMeds.length === 0 ? (
+        <EmptyState icon={Pill} title="No medications on file" description={`${patient.name} has no medications to adjust.`} />
+      ) : (
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+          <div>
+            <p className="eyebrow mb-2">Current prescriptions</p>
+            <ul className="max-h-72 space-y-1.5 overflow-y-auto" role="listbox" aria-label="Medications">
               {patientMeds.map((med) => {
                 const isSelected = selectedMed?.id === med.id;
                 return (
-                  <button
-                    key={med.id}
-                    onClick={() => handleSelectMed(med)}
-                    className={`w-full text-left p-3.5 rounded-2xl border transition-all ${
-                      isSelected
-                        ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-400 shadow-sm'
-                        : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-gray-800 dark:text-gray-200 text-sm">
-                        {med.name}
+                  <li key={med.id}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      onClick={() => handleSelectMed(med)}
+                      className={`w-full rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                        isSelected
+                          ? 'border-brand-500 bg-brand-50/60 dark:border-brand-600 dark:bg-brand-950/40'
+                          : 'border-slate-200 hover:border-slate-300 dark:border-slate-700'
+                      }`}
+                    >
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="truncate text-13 font-medium text-slate-900 dark:text-slate-100">{med.name}</span>
+                        <span className="text-xs font-medium tabular-nums text-slate-600 dark:text-slate-300">{med.dosage}</span>
                       </span>
-                      <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-800 rounded-full">
-                        {med.dosage}
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-0.5">{med.frequency}</p>
-                  </button>
+                      <span className="mt-0.5 block text-xs text-slate-500">{med.frequency.replace(/_/g, ' ')}</span>
+                    </button>
+                  </li>
                 );
               })}
-
-              {patientMeds.length === 0 && (
-                <p className="text-sm text-gray-400 py-6 text-center">No medications found for this patient.</p>
-              )}
-            </div>
+            </ul>
           </div>
 
-          {/* Edit Form */}
-          <div className="bg-gray-50 dark:bg-gray-800/80 p-5 rounded-2xl border border-gray-200 dark:border-gray-700 flex flex-col justify-between">
-            {selectedMed ? (
-              <form onSubmit={handleUpdateDosage} className="space-y-4">
-                <div>
-                  <h4 className="font-bold text-gray-800 dark:text-gray-100 text-base">
-                    Edit Dosage: {selectedMed.name}
-                  </h4>
-                  <p className="text-xs text-gray-500">
-                    Modifications will be logged to the immutable audit trail.
-                  </p>
-                </div>
-
-                {successNotice && (
-                  <div className="p-3 bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-xl text-xs flex items-start gap-2">
-                    <Check className="w-4 h-4 flex-shrink-0 mt-0.5 text-emerald-600" />
-                    <span>{successNotice}</span>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Dosage *
-                  </label>
-                  <input
-                    value={dosage}
-                    onChange={(e) => setDosage(e.target.value)}
-                    placeholder="e.g. 100mg, 500mg, 10ml"
-                    className="w-full p-2.5 border rounded-xl text-sm bg-white dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-emerald-500"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Frequency / Schedule
-                  </label>
-                  <input
-                    value={frequency}
-                    onChange={(e) => setFrequency(e.target.value)}
-                    placeholder="e.g. once daily, twice daily"
-                    className="w-full p-2.5 border rounded-xl text-sm bg-white dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
-
-                <div className="p-3 bg-blue-50 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-900 text-xs text-blue-800 dark:text-blue-300 flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                  <span>Audit trail logs Caregiver ID, timestamp, and new dosage parameters.</span>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={saving || !dosage.trim()}
-                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white py-2.5 rounded-xl text-sm font-semibold transition shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  <Edit2 className="w-4 h-4" />
-                  {saving ? 'Updating...' : 'Update Medication Dosage'}
-                </button>
-              </form>
-            ) : (
-              <div className="text-center py-12 text-gray-400">
-                <Pill className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-                <p className="text-sm">Select a medication on the left to modify dosage or schedule.</p>
+          {selectedMed && (
+            <form id="manage-med-form" onSubmit={handleUpdateDosage} className="space-y-4">
+              <div>
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{selectedMed.name}</p>
+                <p className="text-xs text-slate-500">
+                  Currently <span className="tabular-nums">{selectedMed.dosage}</span> · {selectedMed.frequency.replace(/_/g, ' ')}
+                </p>
               </div>
-            )}
-          </div>
+
+              {successNotice && (
+                <div className="callout callout-info" role="status">
+                  <Check aria-hidden />
+                  <p>{successNotice}</p>
+                </div>
+              )}
+
+              <Field label="New dosage" htmlFor="mm-dosage" required>
+                <input id="mm-dosage" value={dosage} onChange={(e) => setDosage(e.target.value)} placeholder="e.g. 10 mg" className="input tabular-nums" required />
+              </Field>
+              <Field label="Frequency / schedule" htmlFor="mm-frequency">
+                <input id="mm-frequency" value={frequency} onChange={(e) => setFrequency(e.target.value)} placeholder="e.g. twice daily" className="input" />
+              </Field>
+
+              <p className="flex items-start gap-2 text-xs text-slate-500">
+                <History className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                The server records who made the change, when, and the new dose in the activity log.
+              </p>
+            </form>
+          )}
         </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   );
 };
 

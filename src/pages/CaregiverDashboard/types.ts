@@ -13,6 +13,8 @@ export interface AlertItem {
   message: string;
   created_at: string;
   acknowledged?: boolean;
+  /** Built-in demonstration record, not loaded from the server. */
+  sample?: boolean;
 }
 
 export interface CareTask {
@@ -21,5 +23,7 @@ export interface CareTask {
   priority: 'low' | 'normal' | 'high';
   patient?: string;
   completed: boolean;
+  /** Built-in demonstration record, not loaded from the server. */
+  sample?: boolean;
 }
 

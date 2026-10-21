@@ -1,5 +1,8 @@
 import React, { useState, type Dispatch, type SetStateAction } from 'react';
+import { CheckCircle2, Plus, Target, TrendingUp } from 'lucide-react';
 import { HealthGoal, User } from '../../types';
+import { Card, EmptyState, Field, PageHeader, ProgressBar, StatusBadge } from '../../components/ui';
+import { formatDate } from '../../utils/format';
 
 interface HealthGoalsManagerProps {
   selectedMember: User | null;
@@ -9,7 +12,7 @@ interface HealthGoalsManagerProps {
 
 const HealthGoalsManager: React.FC<HealthGoalsManagerProps> = ({ selectedMember, healthGoals, setHealthGoals }) => {
   const memberId = selectedMember?.user_id || '';
-  const memberGoals = healthGoals.filter(goal => goal.member_id === memberId);
+  const memberGoals = healthGoals.filter((goal) => goal.member_id === memberId);
   const [newGoal, setNewGoal] = useState({ title: '', target_value: 1000, unit: 'steps' });
 
   const addGoal = () => {
@@ -28,46 +31,117 @@ const HealthGoalsManager: React.FC<HealthGoalsManagerProps> = ({ selectedMember,
   };
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {memberGoals.map(goal => (
-          <div key={goal.id} className="p-4 bg-white/80 rounded-2xl border">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-semibold text-gray-800">{goal.title}</p>
-                <p className="text-sm text-gray-600">{goal.current_value}/{goal.target_value} {goal.unit}</p>
-              </div>
-              <span className={`text-xs px-2 py-1 rounded-full ${goal.completed ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                {goal.completed ? 'Done' : 'In Progress'}
-              </span>
-            </div>
-            <div className="w-full bg-gray-200 h-2 rounded-full mt-3">
-              <div className="bg-green-500 h-2 rounded-full" style={{ width: `${Math.min(100, Math.round((goal.current_value / goal.target_value) * 100))}%` }} />
-            </div>
-            <div className="flex space-x-2 mt-3">
-              <button onClick={() => setHealthGoals(healthGoals.map(item => item.id === goal.id ? { ...item, current_value: Math.min(item.target_value, item.current_value + Math.ceil(item.target_value * 0.1)) } : item))} className="flex-1 bg-blue-500 text-white py-2 rounded-xl">
-                Add Progress
-              </button>
-              <button onClick={() => setHealthGoals(healthGoals.map(item => item.id === goal.id ? { ...item, completed: true, current_value: item.target_value } : item))} className="flex-1 bg-green-500 text-white py-2 rounded-xl">
-                Complete
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="bg-white/80 p-6 rounded-2xl border">
-        <h4 className="font-bold mb-3">Add Goal</h4>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <input className="p-3 border rounded-xl" placeholder="Title" value={newGoal.title} onChange={event => setNewGoal({ ...newGoal, title: event.target.value })} />
-          <input type="number" className="p-3 border rounded-xl" placeholder="Target" value={newGoal.target_value} onChange={event => setNewGoal({ ...newGoal, target_value: Number(event.target.value) })} />
-          <select className="p-3 border rounded-xl" value={newGoal.unit} onChange={event => setNewGoal({ ...newGoal, unit: event.target.value })}>
-            <option value="steps">steps</option>
-            <option value="minutes">minutes</option>
-            <option value="kg">kg</option>
-          </select>
-          <button onClick={addGoal} className="bg-blue-500 text-white px-6 py-3 rounded-xl">Add</button>
+    <div className="page">
+      <PageHeader
+        eyebrow="Care"
+        title="Health goals"
+        description={`Personal targets and progress for ${selectedMember?.name || 'this member'}.`}
+      />
+
+      {memberGoals.length === 0 ? (
+        <div className="card">
+          <EmptyState icon={Target} title="No goals yet" description="Create a goal below to start tracking progress." />
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {memberGoals.map((goal) => {
+            const pct = Math.min(100, Math.round((goal.current_value / (goal.target_value || 1)) * 100));
+            return (
+              <div key={goal.id} className="card flex flex-col p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{goal.title}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">Due {formatDate(goal.deadline)}</p>
+                  </div>
+                  {goal.completed ? (
+                    <StatusBadge severity="success">Completed</StatusBadge>
+                  ) : (
+                    <StatusBadge severity="info" icon={TrendingUp}>
+                      In progress
+                    </StatusBadge>
+                  )}
+                </div>
+                <div className="mt-4 flex items-baseline justify-between">
+                  <p className="tabular-nums">
+                    <span className="text-xl font-semibold text-slate-900 dark:text-slate-50">{goal.current_value.toLocaleString()}</span>
+                    <span className="text-13 text-slate-500"> / {goal.target_value.toLocaleString()} {goal.unit}</span>
+                  </p>
+                  <span className="text-13 font-medium tabular-nums text-slate-600 dark:text-slate-300">{pct}%</span>
+                </div>
+                <div className="mt-2">
+                  <ProgressBar value={pct} tone={goal.completed ? 'success' : 'brand'} label={`${goal.title} progress`} />
+                </div>
+                <div className="mt-5 flex gap-2">
+                  <button
+                    type="button"
+                    disabled={goal.completed}
+                    onClick={() =>
+                      setHealthGoals(
+                        healthGoals.map((item) =>
+                          item.id === goal.id
+                            ? { ...item, current_value: Math.min(item.target_value, item.current_value + Math.ceil(item.target_value * 0.1)) }
+                            : item
+                        )
+                      )
+                    }
+                    className="btn btn-secondary btn-sm flex-1"
+                  >
+                    <Plus />
+                    Add 10%
+                  </button>
+                  <button
+                    type="button"
+                    disabled={goal.completed}
+                    onClick={() =>
+                      setHealthGoals(
+                        healthGoals.map((item) => (item.id === goal.id ? { ...item, completed: true, current_value: item.target_value } : item))
+                      )
+                    }
+                    className="btn btn-primary btn-sm flex-1"
+                  >
+                    <CheckCircle2 />
+                    Mark complete
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <Card title="New goal">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+          <Field label="Goal" htmlFor="goal-title">
+            <input
+              id="goal-title"
+              className="input"
+              placeholder="e.g. Daily walk"
+              value={newGoal.title}
+              onChange={(event) => setNewGoal({ ...newGoal, title: event.target.value })}
+            />
+          </Field>
+          <Field label="Target" htmlFor="goal-target">
+            <input
+              id="goal-target"
+              type="number"
+              className="input tabular-nums"
+              value={newGoal.target_value}
+              onChange={(event) => setNewGoal({ ...newGoal, target_value: Number(event.target.value) })}
+            />
+          </Field>
+          <Field label="Unit" htmlFor="goal-unit">
+            <select id="goal-unit" className="select" value={newGoal.unit} onChange={(event) => setNewGoal({ ...newGoal, unit: event.target.value })}>
+              <option value="steps">steps</option>
+              <option value="minutes">minutes</option>
+              <option value="kg">kg</option>
+            </select>
+          </Field>
+          <button type="button" onClick={addGoal} className="btn btn-primary">
+            <Plus />
+            Add goal
+          </button>
+        </div>
+      </Card>
     </div>
   );
 };
